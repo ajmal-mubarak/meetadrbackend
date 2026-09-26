@@ -21,3 +21,10 @@ REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = (
 # Cookies for local dev
 AUTH_COOKIE_SECURE = False
 AUTH_COOKIE_SAMESITE = 'Lax'
+
+import sys
+if 'test' in sys.argv:
+    PASSWORD_HASHERS = [
+        'django.contrib.auth.hashers.MD5PasswordHasher',
+    ]
+

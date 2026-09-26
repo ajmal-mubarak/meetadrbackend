@@ -6,6 +6,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Versioned API root
     path('api/v1/auth/', include('apps.accounts.urls')),
+    path('api/v1/patient/', include('apps.accounts.patient_urls')),
     path('api/v1/', include('apps.facilities.urls')),
     path('api/v1/', include('apps.doctors.urls')),
     path('api/v1/', include('apps.appointments.urls')),
