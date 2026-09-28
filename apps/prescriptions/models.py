@@ -13,10 +13,10 @@ class PrescriptionStatus(models.TextChoices):
 class Prescription(models.Model):
     """Clinical consultation prescription issued by an attending doctor."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    appointment = models.OneToOneField(
+    appointment = models.ForeignKey(
         Appointment,
         on_delete=models.PROTECT,
-        related_name='prescription'
+        related_name='prescriptions'
     )
     doctor = models.ForeignKey(
         Doctor,
@@ -41,6 +41,14 @@ class Prescription(models.Model):
         db_table = 'meetadr_prescriptions'
         verbose_name = 'Prescription'
         verbose_name_plural = 'Prescriptions'
+        ordering = ['-issued_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['appointment'],
+                condition=models.Q(status='active'),
+                name='unique_active_prescription_per_appointment'
+            )
+        ]
 
     def __str__(self):
         return f"Prescription for {self.patient.name} by Dr. {self.doctor.name} ({self.status})"
