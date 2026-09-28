@@ -22,13 +22,41 @@ class IsDoctor(permissions.BasePermission):
         )
 
 class IsFacilityAdmin(permissions.BasePermission):
-    """Allows access only to authenticated hospital/clinic administrators."""
+    """
+    Allows access only to authenticated hospital/clinic administrators with an ACTIVE facility.
+
+    Security Invariant:
+    A facility administrator must belong to exactly one facility (Hospital XOR Clinic).
+    If the facility is in 'Deactivated' status, authorization fails closed (403 Forbidden).
+    """
+    message = "Facility administrator access requires an active facility. Your facility is currently deactivated."
+
     def has_permission(self, request, view):
-        return bool(
+        if not (
             request.user and
             request.user.is_authenticated and
             request.user.role == UserRole.HOSPITAL
-        )
+        ):
+            return False
+
+        has_hosp = False
+        try:
+            has_hosp = hasattr(request.user, 'hospital_facility') and request.user.hospital_facility is not None
+        except Exception:
+            has_hosp = False
+
+        has_clinic = False
+        try:
+            has_clinic = hasattr(request.user, 'clinic_facility') and request.user.clinic_facility is not None
+        except Exception:
+            has_clinic = False
+
+        if not (has_hosp ^ has_clinic):
+            return False
+
+        facility = request.user.hospital_facility if has_hosp else request.user.clinic_facility
+        from apps.facilities.models import FacilityStatus
+        return facility.status == FacilityStatus.ACTIVE
 
 class IsPlatformAdmin(permissions.BasePermission):
     """Allows access only to platform superadministrators or staff."""

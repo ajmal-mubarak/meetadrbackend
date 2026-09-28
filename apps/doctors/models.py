@@ -72,6 +72,17 @@ class Doctor(models.Model):
             )
         ]
 
+    def clean(self):
+        super().clean()
+        has_hosp = bool(self.hospital_id)
+        has_clinic = bool(self.clinic_id)
+        if not (has_hosp ^ has_clinic):
+            from django.core.exceptions import ValidationError
+            raise ValidationError(
+                "A doctor must belong to either a Hospital OR a Clinic, strictly exclusive."
+            )
+
+
     def __str__(self):
         facility = self.hospital.name if self.hospital else (self.clinic.name if self.clinic else 'Unassigned')
         return f"Dr. {self.name} ({self.specialty} @ {facility})"

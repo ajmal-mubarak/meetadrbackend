@@ -44,6 +44,20 @@ class ProviderRequest(models.Model):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
+    hospital = models.ForeignKey(
+        'facilities.Hospital',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='provider_requests'
+    )
+    clinic = models.ForeignKey(
+        'facilities.Clinic',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='provider_requests'
+    )
 
     class Meta:
         db_table = 'meetadr_provider_requests'
@@ -52,6 +66,11 @@ class ProviderRequest(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.provider_type}) - {self.status}"
+
+    @property
+    def facility(self):
+        """Returns the created facility (Hospital or Clinic) if approved."""
+        return self.hospital or self.clinic
 
 class ProviderInvitationToken(models.Model):
     """Cryptographic single-use token for newly provisioned facility administrators."""
@@ -73,3 +92,12 @@ class ProviderInvitationToken(models.Model):
 
     def __str__(self):
         return f"Invite Token for {self.user.email} (Used: {self.is_used})"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self):
+        return not self.is_used and not self.is_expired

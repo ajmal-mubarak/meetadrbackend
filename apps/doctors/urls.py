@@ -6,6 +6,10 @@ from apps.doctors.views import (
     DoctorDetailView,
     DoctorAvailabilityView
 )
+from apps.doctors.facility_views import (
+    FacilityDoctorDetailView,
+    FacilityDoctorStatusView
+)
 
 app_name = 'doctors'
 
@@ -17,4 +21,8 @@ urlpatterns = [
 
     # Phase 3: Clinical access to patient medical profile enforced via clinical encounter check
     path('doctor/patients/<uuid:patient_id>/profile/', DoctorPatientMedicalProfileView.as_view(), name='doctor_patient_profile'),
+
+    # Phase 6: Direct doctor inspection/update/status routes for facility administration
+    path('doctor/<uuid:pk>/', FacilityDoctorDetailView.as_view(), name='doctor_detail_management'),
+    path('doctor/<uuid:pk>/status/', FacilityDoctorStatusView.as_view(), name='doctor_status_management'),
 ]

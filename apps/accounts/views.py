@@ -19,8 +19,15 @@ from apps.accounts.serializers import (
     LoginSerializer,
     CustomTokenRefreshSerializer
 )
+import hashlib
+from django.db import transaction
 from apps.accounts.tokens import MeetAdrRefreshToken
 from apps.audit.utils import log_audit_event
+from apps.onboarding.models import ProviderInvitationToken
+from apps.accounts.serializers import (
+    ProviderSetupValidateSerializer,
+    ProviderSetupCompleteSerializer
+)
 
 def set_auth_refresh_cookie(response, refresh_token_str: str):
     """Set the HttpOnly secure refresh token cookie on HTTP response."""
@@ -273,3 +280,92 @@ class DoctorPatientMedicalProfileView(views.APIView):
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ProviderSetupValidateView(views.APIView):
+    """
+    Public validation endpoint for single-use provider administrator invitation tokens.
+    POST /api/v1/auth/provider-setup/validate/
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        serializer = ProviderSetupValidateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        raw_token = serializer.validated_data['token']
+
+        token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+        invitation = ProviderInvitationToken.objects.filter(token_hash=token_hash).select_related(
+            'user', 'user__hospital_facility', 'user__clinic_facility'
+        ).first()
+
+        # Generic failure behavior to prevent token/state enumeration oracle
+        if not invitation or invitation.is_used or invitation.is_expired:
+            return Response({
+                "valid": False,
+                "error": "InvalidInvitation",
+                "message": "Invalid, expired, or previously consumed setup invitation token."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user = invitation.user
+        facility = getattr(user, 'hospital_facility', None) or getattr(user, 'clinic_facility', None)
+        facility_name = facility.name if facility else 'Healthcare Facility'
+        facility_type = 'hospital' if hasattr(user, 'hospital_facility') and user.hospital_facility else 'clinic'
+
+        return Response({
+            "valid": True,
+            "email": user.email,
+            "facility_name": facility_name,
+            "facility_type": facility_type
+        }, status=status.HTTP_200_OK)
+
+class ProviderSetupCompleteView(views.APIView):
+    """
+    Public password establishment endpoint for newly approved facility administrators.
+    POST /api/v1/auth/provider-setup/complete/
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        serializer = ProviderSetupCompleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        raw_token = serializer.validated_data['token']
+        password = serializer.validated_data['password']
+
+        token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+        invitation = ProviderInvitationToken.objects.filter(token_hash=token_hash).select_related('user').first()
+
+        # Generic failure behavior to prevent token/state enumeration oracle
+        if not invitation or invitation.is_used or invitation.is_expired:
+            return Response({
+                "error": "InvalidInvitation",
+                "message": "Invalid, expired, or previously consumed setup invitation token."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            user = invitation.user
+            user.set_password(password)
+            user.role = UserRole.HOSPITAL  # Strict server-side enforcement
+            user.is_active = True
+            user.save()
+
+            invitation.is_used = True
+            invitation.save()
+
+            log_audit_event(
+                action="INVITATION_ACCEPTED",
+                target_model="User",
+                target_id=str(user.id),
+                actor=user,
+                change_summary={
+                    "email": user.email,
+                    "role": user.role,
+                },
+                request=request
+            )
+
+        return Response({
+            "success": True,
+            "message": "Account setup successfully completed. You may now log in with your credentials."
+        }, status=status.HTTP_200_OK)

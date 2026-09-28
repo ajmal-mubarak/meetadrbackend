@@ -12,6 +12,9 @@ urlpatterns = [
     path('api/v1/', include('apps.appointments.urls')),
     path('api/v1/prescriptions/', include('apps.prescriptions.urls')),
     path('api/v1/provider-requests/', include('apps.onboarding.urls')),
+    path('api/v1/admin/', include('apps.onboarding.admin_urls')),
+    path('api/v1/facility/', include('apps.facilities.facility_urls')),
+    path('api/v1/hospital/', include('apps.facilities.facility_urls')),
     path('api/v1/notifications/', include('apps.notifications.urls')),
     # Direct alias for provider administrator appointment operations
     path('api/hospital-admin/appointments/', include('apps.appointments.hospital_admin_urls')),

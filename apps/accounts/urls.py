@@ -5,7 +5,9 @@ from apps.accounts.views import (
     RegisterView,
     RefreshTokenView,
     LogoutView,
-    CurrentUserView
+    CurrentUserView,
+    ProviderSetupValidateView,
+    ProviderSetupCompleteView
 )
 
 app_name = 'accounts'
@@ -16,4 +18,6 @@ urlpatterns = [
     path('token/refresh/', RefreshTokenView.as_view(), name='token_refresh'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('me/', CurrentUserView.as_view(), name='current_user'),
+    path('provider-setup/validate/', ProviderSetupValidateView.as_view(), name='provider_setup_validate'),
+    path('provider-setup/complete/', ProviderSetupCompleteView.as_view(), name='provider_setup_complete'),
 ]

@@ -29,6 +29,10 @@ class UserSummarySerializer(serializers.ModelSerializer):
         if hasattr(obj, 'doctor_profile'):
             doc = obj.doctor_profile
             return str(doc.hospital_id or doc.clinic_id or '') or None
+        elif hasattr(obj, 'hospital_facility') and obj.hospital_facility:
+            return str(obj.hospital_facility.id)
+        elif hasattr(obj, 'clinic_facility') and obj.clinic_facility:
+            return str(obj.clinic_facility.id)
         elif hasattr(obj, 'facility_admin'):
             admin_prof = obj.facility_admin
             return str(admin_prof.hospital_id or admin_prof.clinic_id or '') or None
@@ -38,6 +42,10 @@ class UserSummarySerializer(serializers.ModelSerializer):
         if hasattr(obj, 'doctor_profile'):
             doc = obj.doctor_profile
             return 'hospital' if doc.hospital_id else ('clinic' if doc.clinic_id else None)
+        elif hasattr(obj, 'hospital_facility') and obj.hospital_facility:
+            return 'hospital'
+        elif hasattr(obj, 'clinic_facility') and obj.clinic_facility:
+            return 'clinic'
         elif hasattr(obj, 'facility_admin'):
             admin_prof = obj.facility_admin
             return 'hospital' if admin_prof.hospital_id else ('clinic' if admin_prof.clinic_id else None)
@@ -207,3 +215,19 @@ class CustomTokenRefreshSerializer(serializers.Serializer):
             'access': str(new_refresh.access_token),
             'refresh': str(new_refresh)
         }
+
+class ProviderSetupValidateSerializer(serializers.Serializer):
+    """Payload to validate single-use facility admin setup token."""
+    token = serializers.CharField(required=True, trim_whitespace=True)
+
+class ProviderSetupCompleteSerializer(serializers.Serializer):
+    """Payload to set password and activate facility admin account."""
+    token = serializers.CharField(required=True, trim_whitespace=True)
+    password = serializers.CharField(required=True, write_only=True)
+    password_confirm = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
+        validate_password(attrs['password'])
+        return attrs
