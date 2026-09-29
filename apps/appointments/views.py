@@ -23,6 +23,12 @@ from apps.appointments.serializers import (
 )
 from apps.appointments.services import recalculate_doctor_rating
 from apps.audit.utils import log_audit_event
+from apps.notifications.services import (
+    notify_appointment_booked,
+    notify_appointment_cancelled,
+    notify_appointment_completed,
+    notify_review_submitted,
+)
 
 def is_slot_already_booked_error(exc: IntegrityError) -> bool:
     """
@@ -175,6 +181,7 @@ class AppointmentBookingView(views.APIView):
                     status=AppointmentStatus.CONFIRMED,
                     notes=notes
                 )
+                notify_appointment_booked(appointment)
         except IntegrityError as exc:
             if is_slot_already_booked_error(exc):
                 return Response({
@@ -309,16 +316,18 @@ class AppointmentCancelView(views.APIView):
         serializer.is_valid(raise_exception=True)
         reason = serializer.validated_data.get('reason', 'Cancelled by user')
 
-        # Execute cancellation
-        previous_status = appointment.status
-        appointment.status = AppointmentStatus.CANCELLED
-        appointment.cancel_reason = reason
-        appointment.cancelled_by_role = role
-        appointment.cancelled_by_user = user
-        appointment.cancelled_at = timezone.now()
-        appointment.save(update_fields=[
-            'status', 'cancel_reason', 'cancelled_by_role', 'cancelled_by_user', 'cancelled_at', 'updated_at'
-        ])
+        # Execute cancellation atomically
+        with transaction.atomic():
+            previous_status = appointment.status
+            appointment.status = AppointmentStatus.CANCELLED
+            appointment.cancel_reason = reason
+            appointment.cancelled_by_role = role
+            appointment.cancelled_by_user = user
+            appointment.cancelled_at = timezone.now()
+            appointment.save(update_fields=[
+                'status', 'cancel_reason', 'cancelled_by_role', 'cancelled_by_user', 'cancelled_at', 'updated_at'
+            ])
+            notify_appointment_cancelled(appointment, cancelled_by_user=user, reason=reason)
 
         # Audit event
         log_audit_event(
@@ -393,9 +402,14 @@ class DoctorAppointmentStatusView(views.APIView):
             appointment.cancelled_at = timezone.now()
             appointment.cancel_reason = request.data.get('reason', 'Cancelled by doctor')
 
-        prev_status = appointment.status
-        appointment.status = new_status
-        appointment.save()
+        with transaction.atomic():
+            prev_status = appointment.status
+            appointment.status = new_status
+            appointment.save()
+            if new_status == AppointmentStatus.COMPLETED:
+                notify_appointment_completed(appointment)
+            elif new_status == AppointmentStatus.CANCELLED:
+                notify_appointment_cancelled(appointment, cancelled_by_user=request.user, reason=appointment.cancel_reason)
 
         log_audit_event(
             action="APPOINTMENT_STATUS_UPDATED",
@@ -481,15 +495,17 @@ class HospitalAdminAppointmentCancelView(views.APIView):
         serializer.is_valid(raise_exception=True)
         reason = serializer.validated_data.get('reason', 'Cancelled by facility administrator')
 
-        prev_status = appointment.status
-        appointment.status = AppointmentStatus.CANCELLED
-        appointment.cancel_reason = reason
-        appointment.cancelled_by_role = UserRole.HOSPITAL
-        appointment.cancelled_by_user = user
-        appointment.cancelled_at = timezone.now()
-        appointment.save(update_fields=[
-            'status', 'cancel_reason', 'cancelled_by_role', 'cancelled_by_user', 'cancelled_at', 'updated_at'
-        ])
+        with transaction.atomic():
+            prev_status = appointment.status
+            appointment.status = AppointmentStatus.CANCELLED
+            appointment.cancel_reason = reason
+            appointment.cancelled_by_role = UserRole.HOSPITAL
+            appointment.cancelled_by_user = user
+            appointment.cancelled_at = timezone.now()
+            appointment.save(update_fields=[
+                'status', 'cancel_reason', 'cancelled_by_role', 'cancelled_by_user', 'cancelled_at', 'updated_at'
+            ])
+            notify_appointment_cancelled(appointment, cancelled_by_user=user, reason=reason)
 
         log_audit_event(
             action="FACILITY_ADMIN_APPOINTMENT_CANCELLED",
@@ -540,9 +556,14 @@ class HospitalAdminAppointmentStatusView(views.APIView):
                 "message": f"Cannot complete an appointment with status '{appointment.status}'."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        prev_status = appointment.status
-        appointment.status = new_status
-        appointment.save(update_fields=['status', 'updated_at'])
+        with transaction.atomic():
+            prev_status = appointment.status
+            appointment.status = new_status
+            appointment.save(update_fields=['status', 'updated_at'])
+            if new_status == AppointmentStatus.COMPLETED:
+                notify_appointment_completed(appointment)
+            elif new_status == AppointmentStatus.CANCELLED:
+                notify_appointment_cancelled(appointment, cancelled_by_user=user, reason=appointment.cancel_reason)
 
         log_audit_event(
             action="FACILITY_ADMIN_APPOINTMENT_STATUS_UPDATED",
@@ -614,6 +635,7 @@ class AppointmentReviewView(views.APIView):
                     comment=serializer.validated_data.get('comment', ''),
                 )
                 recalculate_doctor_rating(appointment.doctor_id)
+                notify_review_submitted(review)
 
                 log_audit_event(
                     action="PATIENT_REVIEW_SUBMITTED",

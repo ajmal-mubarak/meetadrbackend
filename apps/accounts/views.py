@@ -23,6 +23,7 @@ import hashlib
 from django.db import transaction
 from apps.accounts.tokens import MeetAdrRefreshToken
 from apps.audit.utils import log_audit_event
+from apps.notifications.services import notify_facility_setup_completed
 from apps.onboarding.models import ProviderInvitationToken
 from apps.accounts.serializers import (
     ProviderSetupValidateSerializer,
@@ -352,6 +353,10 @@ class ProviderSetupCompleteView(views.APIView):
 
             invitation.is_used = True
             invitation.save()
+
+            facility = getattr(user, 'hospital_facility', None) or getattr(user, 'clinic_facility', None)
+            if facility:
+                notify_facility_setup_completed(user, facility)
 
             log_audit_event(
                 action="INVITATION_ACCEPTED",

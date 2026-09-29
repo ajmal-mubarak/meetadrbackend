@@ -22,6 +22,7 @@ from apps.onboarding.serializers import (
 )
 from apps.onboarding.emails import send_provider_invitation_email
 from apps.audit.utils import log_audit_event
+from apps.notifications.services import notify_provider_request_submitted
 
 class ProviderRequestCreateView(generics.CreateAPIView):
     """
@@ -32,7 +33,9 @@ class ProviderRequestCreateView(generics.CreateAPIView):
     serializer_class = ProviderRequestPublicCreateSerializer
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        with transaction.atomic():
+            instance = serializer.save()
+            notify_provider_request_submitted(instance)
         log_audit_event(
             action="PROVIDER_APPLICATION_SUBMITTED",
             target_model="ProviderRequest",

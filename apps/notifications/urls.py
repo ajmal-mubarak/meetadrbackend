@@ -1,8 +1,17 @@
 """Notifications App URL Patterns."""
 from django.urls import path
+from apps.notifications.views import (
+    NotificationListView,
+    NotificationUnreadCountView,
+    NotificationMarkReadView,
+    NotificationMarkAllReadView,
+)
 
 app_name = 'notifications'
 
 urlpatterns = [
-    # Notification endpoints planned for implementation
+    path('', NotificationListView.as_view(), name='notification-list'),
+    path('unread-count/', NotificationUnreadCountView.as_view(), name='notification-unread-count'),
+    path('<uuid:pk>/read/', NotificationMarkReadView.as_view(), name='notification-mark-read'),
+    path('read-all/', NotificationMarkAllReadView.as_view(), name='notification-read-all'),
 ]

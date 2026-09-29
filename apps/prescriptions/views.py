@@ -16,6 +16,10 @@ from apps.prescriptions.serializers import (
     PrescriptionReadSerializer,
 )
 from apps.prescriptions.permissions import can_access_prescription
+from apps.notifications.services import (
+    notify_prescription_ready,
+    notify_prescription_cancelled,
+)
 
 
 class PrescriptionCreateView(APIView):
@@ -97,6 +101,7 @@ class PrescriptionCreateView(APIView):
                     for med in medications_data
                 ]
                 PrescriptionMedication.objects.bulk_create(medication_objects)
+                notify_prescription_ready(prescription)
         except IntegrityError:
             # Handles concurrent creation race condition caught by the partial unique constraint
             return Response(
@@ -277,8 +282,10 @@ class PrescriptionCancelView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        prescription.status = PrescriptionStatus.CANCELLED
-        prescription.save(update_fields=['status'])
+        with transaction.atomic():
+            prescription.status = PrescriptionStatus.CANCELLED
+            prescription.save(update_fields=['status'])
+            notify_prescription_cancelled(prescription)
 
         # Audit event without clinical PHI
         log_audit_event(
