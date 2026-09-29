@@ -1,8 +1,63 @@
 """Appointment Serializers for Booking and Management."""
 from rest_framework import serializers
-from apps.appointments.models import Appointment, AppointmentStatus
+from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview
 from apps.doctors.models import Doctor
 from apps.facilities.models import Hospital, Clinic
+
+class DoctorReviewCreateSerializer(serializers.Serializer):
+    """Payload serializer for submitting post-consultation doctor review."""
+    rating = serializers.IntegerField(required=True)
+    comment = serializers.CharField(max_length=1000, required=False, allow_blank=True, default='')
+
+    def validate_rating(self, value):
+        initial_val = self.initial_data.get('rating')
+        if isinstance(initial_val, (float, bool)):
+            raise serializers.ValidationError("Rating must be an integer between 1 and 5.")
+        if isinstance(initial_val, str) and ('.' in initial_val or not initial_val.isdigit()):
+            raise serializers.ValidationError("Rating must be an integer between 1 and 5.")
+        if not (1 <= value <= 5):
+            raise serializers.ValidationError("Rating must be between 1 and 5.")
+        return value
+
+    def validate_comment(self, value):
+        if value and len(value) > 1000:
+            raise serializers.ValidationError("Comment cannot exceed 1000 characters.")
+        return value.strip() if value else ''
+
+class DoctorReviewSummarySerializer(serializers.ModelSerializer):
+    """Nested review summary for appointment payloads."""
+    createdAt = serializers.DateTimeField(source='created_at', format='%Y-%m-%dT%H:%M:%SZ', read_only=True)
+
+    class Meta:
+        model = DoctorReview
+        fields = ['id', 'rating', 'comment', 'created_at', 'createdAt']
+
+class DoctorReviewDetailSerializer(serializers.ModelSerializer):
+    """Private review serializer for appointment inspection and confirmation."""
+    appointment_id = serializers.CharField(read_only=True)
+    appointmentId = serializers.CharField(source='appointment_id', read_only=True)
+    doctor_id = serializers.CharField(read_only=True)
+    doctorId = serializers.CharField(source='doctor_id', read_only=True)
+    doctor_name = serializers.CharField(source='doctor.name', read_only=True)
+    doctorName = serializers.CharField(source='doctor.name', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', format='%Y-%m-%dT%H:%M:%SZ', read_only=True)
+
+    class Meta:
+        model = DoctorReview
+        fields = [
+            'id',
+            'appointment_id',
+            'appointmentId',
+            'doctor_id',
+            'doctorId',
+            'doctor_name',
+            'doctorName',
+            'rating',
+            'comment',
+            'created_at',
+            'createdAt',
+        ]
+
 
 class AppointmentCreateSerializer(serializers.Serializer):
     """Payload serializer for creating an appointment."""
@@ -59,6 +114,8 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
     createdAt = serializers.DateTimeField(source='created_at', format='%Y-%m-%dT%H:%M:%SZ', read_only=True)
     is_dependent = serializers.SerializerMethodField()
     dependent_id = serializers.SerializerMethodField()
+    is_reviewed = serializers.SerializerMethodField()
+    review = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -79,6 +136,8 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
             'cancelled_at',
             'is_dependent',
             'dependent_id',
+            'is_reviewed',
+            'review',
             # Frontend camelCase aliases
             'patientId',
             'patientName',
@@ -142,3 +201,18 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
 
     def get_dependent_id(self, obj):
         return str(obj.dependent_id) if obj.dependent_id else None
+
+    def get_is_reviewed(self, obj):
+        try:
+            return bool(obj.review)
+        except (AttributeError, DoctorReview.DoesNotExist):
+            return False
+
+    def get_review(self, obj):
+        try:
+            if obj.review:
+                return DoctorReviewSummarySerializer(obj.review).data
+        except (AttributeError, DoctorReview.DoesNotExist):
+            pass
+        return None
+

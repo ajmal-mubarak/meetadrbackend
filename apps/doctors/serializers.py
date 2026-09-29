@@ -82,3 +82,34 @@ class DoctorDetailSerializer(DoctorListSerializer):
                 'emergency_available': False,
             }
         return None
+
+
+class DoctorPublicReviewSerializer(serializers.ModelSerializer):
+    """
+    Public sanitized review serializer.
+    Guarantees strict patient anonymity and zero PII or appointment linkage.
+    """
+    patientDisplayName = serializers.SerializerMethodField()
+    patient_display_name = serializers.SerializerMethodField()
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        from apps.appointments.models import DoctorReview
+        model = DoctorReview
+        fields = [
+            'id',
+            'rating',
+            'comment',
+            'patientDisplayName',
+            'patient_display_name',
+            'createdAt',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_patientDisplayName(self, obj):
+        return "Verified Patient"
+
+    def get_patient_display_name(self, obj):
+        return "Verified Patient"

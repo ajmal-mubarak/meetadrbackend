@@ -12,13 +12,16 @@ from apps.accounts.models import UserRole, PatientProfile, PatientDependent
 from apps.accounts.permissions import IsPatient, IsDoctor, IsFacilityAdmin, IsPlatformAdmin
 from apps.facilities.models import FacilityStatus
 from apps.doctors.models import Doctor
-from apps.appointments.models import Appointment, AppointmentStatus
+from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview
 from apps.appointments.serializers import (
     AppointmentCreateSerializer,
     AppointmentCancelSerializer,
     AppointmentStatusUpdateSerializer,
-    AppointmentDetailSerializer
+    AppointmentDetailSerializer,
+    DoctorReviewCreateSerializer,
+    DoctorReviewDetailSerializer
 )
+from apps.appointments.services import recalculate_doctor_rating
 from apps.audit.utils import log_audit_event
 
 def is_slot_already_booked_error(exc: IntegrityError) -> bool:
@@ -211,7 +214,7 @@ class PatientAppointmentListView(generics.ListAPIView):
         queryset = Appointment.objects.filter(
             booked_by=self.request.user
         ).select_related(
-            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'cancelled_by_user'
+            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'cancelled_by_user', 'review'
         ).order_by('-date', '-created_at')
 
         status_param = self.request.query_params.get('status')
@@ -226,7 +229,7 @@ class AppointmentDetailView(views.APIView):
 
     def get(self, request, pk):
         appointment = Appointment.objects.select_related(
-            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'booked_by', 'cancelled_by_user'
+            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'booked_by', 'cancelled_by_user', 'review'
         ).filter(id=pk).first()
 
         if not appointment:
@@ -343,7 +346,7 @@ class DoctorAppointmentListView(generics.ListAPIView):
         queryset = Appointment.objects.filter(
             doctor=doctor
         ).select_related(
-            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'cancelled_by_user'
+            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'cancelled_by_user', 'review'
         ).order_by('date', 'time_slot')
 
         status_param = self.request.query_params.get('status')
@@ -428,7 +431,7 @@ class HospitalAdminAppointmentListView(generics.ListAPIView):
             return Appointment.objects.none()
 
         queryset = queryset.select_related(
-            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'cancelled_by_user'
+            'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'cancelled_by_user', 'review'
         ).order_by('date', 'time_slot')
 
         status_param = self.request.query_params.get('status')
@@ -555,3 +558,107 @@ class HospitalAdminAppointmentStatusView(views.APIView):
         )
 
         return Response(AppointmentDetailSerializer(appointment).data, status=status.HTTP_200_OK)
+
+class AppointmentReviewView(views.APIView):
+    """
+    Post-consultation verified review endpoint.
+    POST /api/v1/appointments/<uuid:pk>/review/ (Patient creates review)
+    GET /api/v1/appointments/<uuid:pk>/review/ (Patient or attending Doctor reads review)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.role != UserRole.PATIENT:
+            raise PermissionDenied("Only authenticated patients can submit reviews.")
+
+        appointment = Appointment.objects.select_related('doctor', 'booked_by').filter(id=pk).first()
+        if not appointment or appointment.booked_by_id != request.user.id:
+            raise NotFound("Appointment not found.")
+
+        if appointment.status != AppointmentStatus.COMPLETED:
+            return Response({
+                "error": "ValidationError",
+                "code": "CANNOT_REVIEW_UNCOMPLETED",
+                "message": "Only completed appointments can be reviewed."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if DoctorReview.objects.filter(appointment=appointment).exists():
+            return Response({
+                "error": "ConflictError",
+                "code": "ALREADY_REVIEWED",
+                "message": "This appointment has already been reviewed."
+            }, status=status.HTTP_409_CONFLICT)
+
+        serializer = DoctorReviewCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            if 'rating' in serializer.errors:
+                return Response({
+                    "error": "ValidationError",
+                    "code": "INVALID_RATING",
+                    "message": "Rating must be an integer between 1 and 5."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            err_msg = serializer.errors.get('comment', ['Invalid input.'])[0] if 'comment' in serializer.errors else "Invalid input."
+            return Response({
+                "error": "ValidationError",
+                "code": "INVALID_INPUT",
+                "message": err_msg
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                review = DoctorReview.objects.create(
+                    appointment=appointment,
+                    doctor=appointment.doctor,
+                    patient=request.user,
+                    rating=serializer.validated_data['rating'],
+                    comment=serializer.validated_data.get('comment', ''),
+                )
+                recalculate_doctor_rating(appointment.doctor_id)
+
+                log_audit_event(
+                    action="PATIENT_REVIEW_SUBMITTED",
+                    target_model="DoctorReview",
+                    target_id=str(review.id),
+                    actor=request.user,
+                    change_summary={
+                        "doctor_id": str(appointment.doctor_id),
+                        "appointment_id": str(appointment.id),
+                        "rating": review.rating,
+                        "review_id": str(review.id),
+                    },
+                    request=request
+                )
+        except IntegrityError:
+            return Response({
+                "error": "ConflictError",
+                "code": "ALREADY_REVIEWED",
+                "message": "This appointment has already been reviewed."
+            }, status=status.HTTP_409_CONFLICT)
+
+        return Response(DoctorReviewDetailSerializer(review).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request, pk):
+        appointment = Appointment.objects.select_related(
+            'doctor', 'doctor__user', 'booked_by'
+        ).filter(id=pk).first()
+
+        if not appointment:
+            raise NotFound("Appointment not found.")
+
+        user = request.user
+        is_authorized = False
+
+        if user.role == UserRole.PATIENT and appointment.booked_by_id == user.id:
+            is_authorized = True
+        elif user.role == UserRole.DOCTOR and hasattr(user, 'doctor_profile') and appointment.doctor_id == user.doctor_profile.id:
+            is_authorized = True
+
+        if not is_authorized:
+            raise NotFound("Appointment not found.")
+
+        review = DoctorReview.objects.select_related('doctor').filter(appointment=appointment).first()
+        if not review:
+            raise NotFound("No review found for this appointment.")
+
+        return Response(DoctorReviewDetailSerializer(review).data, status=status.HTTP_200_OK)
+

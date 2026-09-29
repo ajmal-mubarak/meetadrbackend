@@ -9,7 +9,8 @@ from apps.appointments.views import (
     DoctorAppointmentStatusView,
     HospitalAdminAppointmentListView,
     HospitalAdminAppointmentCancelView,
-    HospitalAdminAppointmentStatusView
+    HospitalAdminAppointmentStatusView,
+    AppointmentReviewView
 )
 
 app_name = 'appointments'
@@ -21,6 +22,7 @@ urlpatterns = [
     path('appointments/<uuid:pk>/', AppointmentDetailView.as_view(), name='appointment_detail'),
     path('appointments/<uuid:pk>/cancel/', AppointmentCancelView.as_view(), name='appointment_cancel'),
     path('appointments/<uuid:pk>/complete/', DoctorAppointmentStatusView.as_view(), name='appointment_complete'),
+    path('appointments/<uuid:pk>/review/', AppointmentReviewView.as_view(), name='appointment_review'),
 
     # Doctor consultation workflows
     path('doctor/appointments/', DoctorAppointmentListView.as_view(), name='doctor_appointments'),

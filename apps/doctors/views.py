@@ -8,8 +8,52 @@ from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import NotFound, ValidationError
 from apps.doctors.models import Doctor, DoctorSchedule
 from apps.facilities.models import FacilityStatus
-from apps.appointments.models import Appointment, AppointmentStatus
-from apps.doctors.serializers import DoctorListSerializer, DoctorDetailSerializer
+from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview
+from apps.doctors.serializers import (
+    DoctorListSerializer,
+    DoctorDetailSerializer,
+    DoctorPublicReviewSerializer,
+)
+from rest_framework.pagination import PageNumberPagination
+
+
+class DoctorReviewPagination(PageNumberPagination):
+    """Public reviews pagination: default 10, max 50."""
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
+
+class DoctorPublicReviewListView(generics.ListAPIView):
+    """
+    Public, read-only list of verified patient reviews for an active doctor.
+    Enforces active doctor and active facility discovery rules.
+    Guarantees strict reviewer anonymity.
+    """
+    permission_classes = [AllowAny]
+    serializer_class = DoctorPublicReviewSerializer
+    pagination_class = DoctorReviewPagination
+
+    def get_queryset(self):
+        doctor_id = self.kwargs.get('pk')
+        try:
+            valid_uuid = uuid.UUID(str(doctor_id))
+        except (ValueError, TypeError):
+            raise NotFound("Doctor not found or not active.")
+
+        doctor = Doctor.objects.filter(
+            id=valid_uuid,
+            status=FacilityStatus.ACTIVE
+        ).filter(
+            Q(hospital__isnull=False, hospital__status=FacilityStatus.ACTIVE) |
+            Q(clinic__isnull=False, clinic__status=FacilityStatus.ACTIVE)
+        ).first()
+
+        if not doctor:
+            raise NotFound("Doctor not found or not active.")
+
+        return DoctorReview.objects.filter(doctor=doctor).order_by('-created_at')
+
 
 class DoctorListView(generics.ListAPIView):
     """

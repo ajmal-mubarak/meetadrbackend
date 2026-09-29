@@ -146,6 +146,15 @@ class DoctorReview(models.Model):
         db_table = 'meetadr_doctor_reviews'
         verbose_name = 'Doctor Review'
         verbose_name_plural = 'Doctor Reviews'
+        indexes = [
+            models.Index(fields=['doctor', '-created_at'], name='rev_doc_created_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rating__gte=1, rating__lte=5),
+                name='doctor_review_rating_1_to_5'
+            )
+        ]
 
     def __str__(self):
         return f"Review for Dr. {self.doctor.name}: {self.rating} stars"
