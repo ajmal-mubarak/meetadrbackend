@@ -107,12 +107,12 @@ def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: st
             link="/patient/bookings"
         )
 
-    # Cancelled by facility administrator -> notify patient and doctor
-    elif role in ('hospital', 'clinic'):
+    # Cancelled by facility or platform administrator -> notify patient and doctor
+    elif role in ('hospital', 'clinic', 'admin'):
         create_notification(
             user=patient_user,
             title="Appointment Cancelled",
-            description=f"Your appointment on {appointment.date} was cancelled by the facility.",
+            description=f"Your appointment on {appointment.date} was cancelled by administration.",
             notification_type=NotificationType.APPOINTMENT,
             link="/patient/bookings"
         )
@@ -120,7 +120,7 @@ def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: st
             create_notification(
                 user=doctor_user,
                 title="Appointment Cancelled",
-                description=f"Consultation scheduled for {appointment.date} at {appointment.time_slot} was cancelled by facility administration.",
+                description=f"Consultation scheduled for {appointment.date} at {appointment.time_slot} was cancelled by administration.",
                 notification_type=NotificationType.APPOINTMENT,
                 link="/doctor/dashboard"
             )

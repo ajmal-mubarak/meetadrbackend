@@ -30,6 +30,7 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'drf_spectacular',
 ]
 
 LOCAL_APPS = [
@@ -118,6 +119,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
@@ -139,6 +141,34 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
+}
+
+# drf-spectacular OpenAPI 3.0 Configuration
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'MeetAdr Healthcare API',
+    'DESCRIPTION': (
+        'Enterprise healthcare appointment booking and provider discovery platform. '
+        'Secured via short-lived JWT access tokens in the Authorization header '
+        '(Bearer <access_token>) and rotation-tracked refresh tokens in HttpOnly cookies.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SECURITY': [
+        {
+            'BearerAuth': []
+        }
+    ],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'BearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+                'description': 'Enter JWT Bearer token obtained from /api/v1/auth/token/',
+            }
+        }
+    },
 }
 
 # SimpleJWT Authentication Policy

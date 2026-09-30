@@ -1,5 +1,6 @@
 """Doctor Directory and Availability Serializers."""
 from rest_framework import serializers
+from apps.facilities.models import FacilityStatus
 from apps.doctors.models import Doctor, DoctorSchedule
 from apps.facilities.serializers import HospitalListSerializer, ClinicListSerializer
 
@@ -213,3 +214,69 @@ class DoctorPublicReviewSerializer(serializers.ModelSerializer):
 
     def get_patient_display_name(self, obj):
         return "Verified Patient"
+
+
+class AdminDoctorListSerializer(DoctorListSerializer):
+    """
+    Platform-wide admin serializer for Doctor management.
+    Provides camelCase aliases for the AdminDoctors frontend contract while preserving
+    snake_case attributes and relational facility details.
+    """
+    experience = serializers.SerializerMethodField()
+    hospitalName = serializers.SerializerMethodField()
+    clinicName = serializers.SerializerMethodField()
+    hospitalId = serializers.SerializerMethodField()
+    clinicId = serializers.SerializerMethodField()
+    consultationFee = serializers.DecimalField(source='consultation_fee', max_digits=8, decimal_places=2, read_only=True)
+    reviewCount = serializers.IntegerField(source='review_count', read_only=True)
+    specialInterest = serializers.JSONField(source='special_interests', read_only=True)
+    availableDays = serializers.SerializerMethodField()
+    availableSlots = serializers.SerializerMethodField()
+
+    class Meta(DoctorListSerializer.Meta):
+        fields = DoctorListSerializer.Meta.fields + [
+            'experience',
+            'hospitalName',
+            'clinicName',
+            'hospitalId',
+            'clinicId',
+            'consultationFee',
+            'reviewCount',
+            'specialInterest',
+            'availableDays',
+            'availableSlots',
+        ]
+
+    def get_experience(self, obj):
+        if obj.experience_text:
+            return obj.experience_text
+        return f"{obj.experience_years} years"
+
+    def get_hospitalName(self, obj):
+        return obj.hospital.name if obj.hospital else None
+
+    def get_clinicName(self, obj):
+        return obj.clinic.name if obj.clinic else None
+
+    def get_hospitalId(self, obj):
+        return str(obj.hospital_id) if obj.hospital_id else None
+
+    def get_clinicId(self, obj):
+        return str(obj.clinic_id) if obj.clinic_id else None
+
+    def get_availableDays(self, obj):
+        return self.get_available_days(obj)
+
+    def get_availableSlots(self, obj):
+        if hasattr(obj, 'schedule') and obj.schedule:
+            return obj.schedule.standard_slots
+        return []
+
+
+class AdminDoctorStatusUpdateSerializer(serializers.Serializer):
+    """
+    Platform administrator doctor activation/deactivation payload serializer.
+    Permits strictly and exclusively the status choice field.
+    """
+    status = serializers.ChoiceField(choices=FacilityStatus.choices)
+
