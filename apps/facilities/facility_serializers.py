@@ -26,6 +26,7 @@ class FacilitySettingsSerializer(serializers.Serializer):
     about = serializers.CharField(required=False)
     about_ar = serializers.CharField(required=False, allow_blank=True)
     emergency_available = serializers.BooleanField(required=False)
+    insurance_plans = serializers.CharField(required=False, allow_blank=True)
     primary_specialty = serializers.CharField(max_length=128, required=False)
     status = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
@@ -55,8 +56,10 @@ class FacilitySettingsSerializer(serializers.Serializer):
         }
         if isinstance(instance, Hospital):
             data['emergency_available'] = instance.emergency_available
+            data['insurance_plans'] = instance.insurance_plans
         elif isinstance(instance, Clinic):
             data['primary_specialty'] = instance.primary_specialty
+            data['insurance_plans'] = instance.insurance_plans
         return data
 
     def update(self, instance, validated_data):
@@ -67,8 +70,10 @@ class FacilitySettingsSerializer(serializers.Serializer):
         ]
         if isinstance(instance, Hospital):
             permitted_fields.append('emergency_available')
+            permitted_fields.append('insurance_plans')
         elif isinstance(instance, Clinic):
             permitted_fields.append('primary_specialty')
+            permitted_fields.append('insurance_plans')
 
         for field in permitted_fields:
             if field in validated_data:
@@ -79,10 +84,18 @@ class FacilitySettingsSerializer(serializers.Serializer):
 
 class FacilityDepartmentManageSerializer(serializers.ModelSerializer):
     """Clinical department serializer within a hospital."""
+    doctor_count = serializers.SerializerMethodField()
+
     class Meta:
         model = FacilityDepartment
-        fields = ['id', 'name', 'head_of_department', 'bed_capacity', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'name', 'head_of_department', 'bed_capacity', 'doctor_count', 'created_at']
+        read_only_fields = ['id', 'doctor_count', 'created_at']
+
+    def get_doctor_count(self, obj):
+        from apps.doctors.models import Doctor
+        if not obj.hospital_id:
+            return 0
+        return Doctor.objects.filter(hospital_id=obj.hospital_id, specialty__iexact=obj.name).count()
 
 class AdminFacilityStatusUpdateSerializer(serializers.Serializer):
     """Platform administrator facility activation/deactivation payload."""

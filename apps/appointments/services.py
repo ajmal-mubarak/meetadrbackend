@@ -22,6 +22,7 @@ def recalculate_doctor_rating(doctor_id):
         doctor.rating = Decimal(str(round(avg_rating, 2)))
         doctor.review_count = count
     else:
+        doctor.rating = Decimal('0.00')
         doctor.review_count = 0
 
     doctor.save(update_fields=['rating', 'review_count', 'updated_at'])

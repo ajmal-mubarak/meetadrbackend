@@ -11,12 +11,13 @@ class UserSummarySerializer(serializers.ModelSerializer):
     doctor_id = serializers.SerializerMethodField()
     facility_id = serializers.SerializerMethodField()
     facility_type = serializers.SerializerMethodField()
+    facility_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'email', 'name', 'phone', 'role', 'avatar',
-            'doctor_id', 'facility_id', 'facility_type', 'date_joined'
+            'doctor_id', 'facility_id', 'facility_type', 'facility_name', 'date_joined'
         ]
         read_only_fields = ['id', 'email', 'role', 'date_joined']
 
@@ -51,6 +52,25 @@ class UserSummarySerializer(serializers.ModelSerializer):
             return 'hospital' if admin_prof.hospital_id else ('clinic' if admin_prof.clinic_id else None)
         return None
 
+    def get_facility_name(self, obj):
+        if hasattr(obj, 'hospital_facility') and obj.hospital_facility:
+            return obj.hospital_facility.name
+        elif hasattr(obj, 'clinic_facility') and obj.clinic_facility:
+            return obj.clinic_facility.name
+        elif hasattr(obj, 'facility_admin'):
+            admin_prof = obj.facility_admin
+            if getattr(admin_prof, 'hospital', None):
+                return admin_prof.hospital.name
+            if getattr(admin_prof, 'clinic', None):
+                return admin_prof.clinic.name
+        elif hasattr(obj, 'doctor_profile'):
+            doc = obj.doctor_profile
+            if doc.hospital:
+                return doc.hospital.name
+            if doc.clinic:
+                return doc.clinic.name
+        return None
+
 class PatientDependentSerializer(serializers.ModelSerializer):
     """Serializer for patient dependent profiles."""
     class Meta:
@@ -81,12 +101,13 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     doctor_id = serializers.SerializerMethodField()
     facility_id = serializers.SerializerMethodField()
     facility_type = serializers.SerializerMethodField()
+    facility_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'email', 'name', 'phone', 'role', 'avatar',
-            'doctor_id', 'facility_id', 'facility_type',
+            'doctor_id', 'facility_id', 'facility_type', 'facility_name',
             'patient_profile', 'date_joined'
         ]
         read_only_fields = ['id', 'email', 'role', 'date_joined']
@@ -98,18 +119,30 @@ class CurrentUserSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'doctor_profile'):
             doc = obj.doctor_profile
             return str(doc.hospital_id or doc.clinic_id or '') or None
-        elif hasattr(obj, 'facility_admin'):
-            admin_prof = obj.facility_admin
-            return str(admin_prof.hospital_id or admin_prof.clinic_id or '') or None
+        elif hasattr(obj, 'hospital_facility') and obj.hospital_facility:
+            return str(obj.hospital_facility.id)
+        elif hasattr(obj, 'clinic_facility') and obj.clinic_facility:
+            return str(obj.clinic_facility.id)
         return None
 
     def get_facility_type(self, obj):
         if hasattr(obj, 'doctor_profile'):
             doc = obj.doctor_profile
             return 'hospital' if doc.hospital_id else ('clinic' if doc.clinic_id else None)
-        elif hasattr(obj, 'facility_admin'):
-            admin_prof = obj.facility_admin
-            return 'hospital' if admin_prof.hospital_id else ('clinic' if admin_prof.clinic_id else None)
+        elif hasattr(obj, 'hospital_facility') and obj.hospital_facility:
+            return 'hospital'
+        elif hasattr(obj, 'clinic_facility') and obj.clinic_facility:
+            return 'clinic'
+        return None
+
+    def get_facility_name(self, obj):
+        if hasattr(obj, 'hospital_facility') and obj.hospital_facility:
+            return obj.hospital_facility.name
+        elif hasattr(obj, 'clinic_facility') and obj.clinic_facility:
+            return obj.clinic_facility.name
+        elif hasattr(obj, 'doctor_profile'):
+            doc = obj.doctor_profile
+            return doc.hospital.name if doc.hospital else (doc.clinic.name if doc.clinic else None)
         return None
 
 class PatientRegisterSerializer(serializers.Serializer):
@@ -159,7 +192,16 @@ class LoginSerializer(serializers.Serializer):
         if not email or not password:
             raise AuthenticationFailed("Must include both email and password.")
 
-        user = authenticate(email=email, password=password)
+        req = self.context.get('request')
+        user = authenticate(request=req, username=email, password=password)
+        if not user:
+            user = authenticate(request=req, email=email, password=password)
+        if not user:
+            # Bulletproof fallback: check user directly by case-insensitive email
+            matched = User.objects.filter(email__iexact=email).first()
+            if matched and matched.check_password(password):
+                user = matched
+
         if not user:
             raise AuthenticationFailed("Invalid email or password.")
         if not user.is_active:

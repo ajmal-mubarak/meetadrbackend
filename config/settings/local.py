@@ -45,9 +45,16 @@ REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = (
 AUTH_COOKIE_SECURE = False
 AUTH_COOKIE_SAMESITE = 'Lax'
 
+# ── Email: print to console in local dev ─────────────────────────────────────
+# Invitation emails will appear in the Django runserver terminal output.
+# Copy the setup link from there to give to the hospital administrator.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Frontend URL for invitation links — must match the running Vite dev server port
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
 import sys
 if 'test' in sys.argv:
     PASSWORD_HASHERS = [
         'django.contrib.auth.hashers.MD5PasswordHasher',
     ]
-

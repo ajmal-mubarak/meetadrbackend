@@ -2,6 +2,7 @@
 import secrets
 import hashlib
 from datetime import timedelta
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -320,3 +321,87 @@ class AdminProviderRequestStatusView(views.APIView):
             )
 
             return Response(AdminProviderRequestListSerializer(app).data, status=status.HTTP_200_OK)
+
+
+class AdminResendInvitationView(views.APIView):
+    """
+    Regenerates a fresh setup invitation token for an approved provider and
+    returns the direct setup link so the admin can manually deliver it.
+
+    POST /api/v1/admin/requests/{id}/resend-invitation/
+
+    Security:
+    - Platform admin only.
+    - Only allowed for approved applications.
+    - Invalidates the previous token and creates a new 72-hour one.
+    - The raw token is returned ONCE in the response body (admin responsibility to deliver it).
+    - The raw token is never persisted; only its SHA-256 hash is stored.
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request, pk):
+        try:
+            app = ProviderRequest.objects.select_related('hospital', 'clinic').get(pk=pk)
+        except (ProviderRequest.DoesNotExist, ValueError):
+            raise NotFound("Provider request not found.")
+
+        if app.status != RequestStatus.APPROVED:
+            return Response({
+                "error": "ValidationError",
+                "code": "NOT_APPROVED",
+                "message": "Invitation can only be resent for approved applications."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        facility = app.hospital or app.clinic
+        if not facility or not facility.admin_user:
+            return Response({
+                "error": "ValidationError",
+                "code": "NO_FACILITY_USER",
+                "message": "No facility administrator account found for this application."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user = facility.admin_user
+
+        with transaction.atomic():
+            # Generate fresh single-use token
+            raw_token = secrets.token_urlsafe(48)
+            token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+            expires_at = timezone.now() + timedelta(hours=72)
+
+            ProviderInvitationToken.objects.update_or_create(
+                user=user,
+                defaults={
+                    'token_hash': token_hash,
+                    'expires_at': expires_at,
+                    'is_used': False,
+                }
+            )
+
+            log_audit_event(
+                action="INVITATION_RESENT",
+                target_model="ProviderRequest",
+                target_id=str(app.id),
+                actor=request.user,
+                change_summary={
+                    "facility_name": facility.name,
+                    "admin_email": user.email,
+                    "expires_at": expires_at.isoformat(),
+                },
+                request=request
+            )
+
+        # Also attempt email delivery
+        send_provider_invitation_email(user, facility, raw_token)
+
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        setup_link = f"{frontend_url}/provider-setup?token={raw_token}"
+
+        return Response({
+            "success": True,
+            "message": f"Invitation regenerated for {user.email}. Setup link is valid for 72 hours.",
+            "admin_email": user.email,
+            "facility_name": facility.name,
+            "setup_link": setup_link,
+            "expires_at": expires_at.isoformat(),
+        }, status=status.HTTP_200_OK)
+

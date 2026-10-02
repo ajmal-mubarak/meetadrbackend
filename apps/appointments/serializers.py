@@ -1,6 +1,6 @@
 """Appointment Serializers for Booking and Management."""
 from rest_framework import serializers
-from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview
+from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview, FacilityReview
 from apps.doctors.models import Doctor
 from apps.facilities.models import Hospital, Clinic
 
@@ -57,6 +57,69 @@ class DoctorReviewDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'createdAt',
         ]
+
+
+class FacilityReviewCreateSerializer(serializers.Serializer):
+    """Payload serializer for submitting post-consultation hospital/clinic review."""
+    rating = serializers.IntegerField(required=True)
+    comment = serializers.CharField(max_length=1000, required=False, allow_blank=True, default='')
+
+    def validate_rating(self, value):
+        initial_val = self.initial_data.get('rating')
+        if isinstance(initial_val, (float, bool)):
+            raise serializers.ValidationError("Rating must be an integer between 1 and 5.")
+        if isinstance(initial_val, str) and ('.' in initial_val or not initial_val.isdigit()):
+            raise serializers.ValidationError("Rating must be an integer between 1 and 5.")
+        if not (1 <= value <= 5):
+            raise serializers.ValidationError("Rating must be between 1 and 5.")
+        return value
+
+    def validate_comment(self, value):
+        if value and len(value) > 1000:
+            raise serializers.ValidationError("Comment cannot exceed 1000 characters.")
+        return value.strip() if value else ''
+
+
+class FacilityReviewSummarySerializer(serializers.ModelSerializer):
+    """Nested facility review summary for appointment payloads."""
+    createdAt = serializers.DateTimeField(source='created_at', format='%Y-%m-%dT%H:%M:%SZ', read_only=True)
+
+    class Meta:
+        model = FacilityReview
+        fields = ['id', 'rating', 'comment', 'created_at', 'createdAt']
+
+
+class FacilityReviewDetailSerializer(serializers.ModelSerializer):
+    """Facility review detail serializer."""
+    appointment_id = serializers.CharField(read_only=True)
+    appointmentId = serializers.CharField(source='appointment_id', read_only=True)
+    facility_name = serializers.SerializerMethodField()
+    facilityName = serializers.SerializerMethodField()
+    createdAt = serializers.DateTimeField(source='created_at', format='%Y-%m-%dT%H:%M:%SZ', read_only=True)
+
+    class Meta:
+        model = FacilityReview
+        fields = [
+            'id',
+            'appointment_id',
+            'appointmentId',
+            'facility_name',
+            'facilityName',
+            'rating',
+            'comment',
+            'created_at',
+            'createdAt',
+        ]
+
+    def get_facility_name(self, obj):
+        if obj.hospital:
+            return obj.hospital.name
+        if obj.clinic:
+            return obj.clinic.name
+        return ''
+
+    def get_facilityName(self, obj):
+        return self.get_facility_name(obj)
 
 
 class AppointmentCreateSerializer(serializers.Serializer):
@@ -116,6 +179,14 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
     dependent_id = serializers.SerializerMethodField()
     is_reviewed = serializers.SerializerMethodField()
     review = serializers.SerializerMethodField()
+    is_doctor_reviewed = serializers.SerializerMethodField()
+    is_facility_reviewed = serializers.SerializerMethodField()
+    doctor_review = serializers.SerializerMethodField()
+    facility_review = serializers.SerializerMethodField()
+    isDoctorReviewed = serializers.SerializerMethodField()
+    isFacilityReviewed = serializers.SerializerMethodField()
+    doctorReview = serializers.SerializerMethodField()
+    facilityReview = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -138,6 +209,10 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
             'dependent_id',
             'is_reviewed',
             'review',
+            'is_doctor_reviewed',
+            'is_facility_reviewed',
+            'doctor_review',
+            'facility_review',
             # Frontend camelCase aliases
             'patientId',
             'patientName',
@@ -160,6 +235,10 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
             'cancelledBy',
             'cancelledByName',
             'createdAt',
+            'isDoctorReviewed',
+            'isFacilityReviewed',
+            'doctorReview',
+            'facilityReview',
         ]
 
     def get_patientId(self, obj):
@@ -215,4 +294,36 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         except (AttributeError, DoctorReview.DoesNotExist):
             pass
         return None
+
+    def get_is_doctor_reviewed(self, obj):
+        return self.get_is_reviewed(obj)
+
+    def get_isDoctorReviewed(self, obj):
+        return self.get_is_reviewed(obj)
+
+    def get_doctor_review(self, obj):
+        return self.get_review(obj)
+
+    def get_doctorReview(self, obj):
+        return self.get_review(obj)
+
+    def get_is_facility_reviewed(self, obj):
+        try:
+            return bool(obj.facility_review)
+        except (AttributeError, FacilityReview.DoesNotExist):
+            return False
+
+    def get_isFacilityReviewed(self, obj):
+        return self.get_is_facility_reviewed(obj)
+
+    def get_facility_review(self, obj):
+        try:
+            if obj.facility_review:
+                return FacilityReviewSummarySerializer(obj.facility_review).data
+        except (AttributeError, FacilityReview.DoesNotExist):
+            pass
+        return None
+
+    def get_facilityReview(self, obj):
+        return self.get_facility_review(obj)
 

@@ -158,3 +158,64 @@ class DoctorReview(models.Model):
 
     def __str__(self):
         return f"Review for Dr. {self.doctor.name}: {self.rating} stars"
+
+
+class FacilityReview(models.Model):
+    """Verified patient feedback and 1-5 star rating on a medical facility (Hospital or Clinic)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    appointment = models.OneToOneField(
+        Appointment,
+        on_delete=models.PROTECT,
+        related_name='facility_review'
+    )
+    hospital = models.ForeignKey(
+        Hospital,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='reviews'
+    )
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='reviews'
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='facility_reviews'
+    )
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'meetadr_facility_reviews'
+        verbose_name = 'Facility Review'
+        verbose_name_plural = 'Facility Reviews'
+        indexes = [
+            models.Index(fields=['hospital', '-created_at'], name='rev_hosp_created_idx'),
+            models.Index(fields=['clinic', '-created_at'], name='rev_clinic_created_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rating__gte=1, rating__lte=5),
+                name='facility_review_rating_1_to_5'
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(hospital__isnull=False, clinic__isnull=True) |
+                    models.Q(hospital__isnull=True, clinic__isnull=False)
+                ),
+                name='facility_review_hospital_xor_clinic'
+            ),
+        ]
+
+    def __str__(self):
+        facility_name = self.hospital.name if self.hospital else (self.clinic.name if self.clinic else 'Facility')
+        return f"Review for {facility_name}: {self.rating} stars"
+

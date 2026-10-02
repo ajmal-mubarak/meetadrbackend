@@ -25,6 +25,7 @@ from apps.accounts.tokens import MeetAdrRefreshToken
 from apps.audit.utils import log_audit_event
 from apps.notifications.services import notify_facility_setup_completed
 from apps.onboarding.models import ProviderInvitationToken
+from apps.facilities.models import FacilityStatus
 from apps.accounts.serializers import (
     ProviderSetupValidateSerializer,
     ProviderSetupCompleteSerializer
@@ -64,7 +65,7 @@ class LoginView(views.APIView):
     throttle_scope = 'auth'
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = LoginSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
 
@@ -356,6 +357,8 @@ class ProviderSetupCompleteView(views.APIView):
 
             facility = getattr(user, 'hospital_facility', None) or getattr(user, 'clinic_facility', None)
             if facility:
+                facility.status = FacilityStatus.ACTIVE
+                facility.save(update_fields=['status', 'updated_at'])
                 notify_facility_setup_completed(user, facility)
 
             log_audit_event(
@@ -370,7 +373,14 @@ class ProviderSetupCompleteView(views.APIView):
                 request=request
             )
 
-        return Response({
+        refresh = MeetAdrRefreshToken.for_user(user)
+
+        response = Response({
             "success": True,
-            "message": "Account setup successfully completed. You may now log in with your credentials."
+            "message": "Account setup successfully completed.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserSummarySerializer(user).data
         }, status=status.HTTP_200_OK)
+        set_auth_refresh_cookie(response, str(refresh))
+        return response

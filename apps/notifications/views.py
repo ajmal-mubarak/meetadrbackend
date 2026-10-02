@@ -85,3 +85,27 @@ class NotificationMarkAllReadView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class NotificationDeleteView(APIView):
+    """
+    Deletes a single notification for the authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        notification = get_object_or_404(Notification, id=pk, user=request.user)
+        notification.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationClearAllView(APIView):
+    """
+    Clears all notifications for the authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        deleted_count, _ = Notification.objects.filter(user=request.user).delete()
+        return Response({'deletedCount': deleted_count}, status=status.HTTP_200_OK)
+

@@ -1,5 +1,7 @@
 """Views for facility-scoped doctor roster management and IDOR protection."""
+from django.db import transaction
 from django.db.models import Q
+from django.db.models.deletion import ProtectedError
 from rest_framework import generics, views, status
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -103,11 +105,14 @@ class FacilityDoctorDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsFacilityAdmin]
     serializer_class = FacilityDoctorSerializer
 
-    def get_object(self):
+    def get_facility(self):
         fac_type, facility = get_facility_for_user(self.request.user)
         if not facility:
             raise PermissionDenied("User is not associated with an authorized medical facility.")
+        return fac_type, facility
 
+    def get_object(self):
+        fac_type, facility = self.get_facility()
         doctor_id = self.kwargs.get('pk')
 
         if fac_type == 'hospital':
@@ -140,7 +145,25 @@ class FacilityDoctorDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         doctor_id = str(instance.id)
         doctor_name = instance.name
-        instance.delete()
+        fac_type, facility = self.get_facility()
+
+        try:
+            with transaction.atomic():
+                instance.delete()
+        except ProtectedError:
+            # Doctor has protected historical appointment/prescription records.
+            # Safely de-register and dissociate practitioner from this facility:
+            if fac_type == 'hospital':
+                instance.hospital = None
+            else:
+                instance.clinic = None
+            instance.status = FacilityStatus.DEACTIVATED
+            instance.save(update_fields=['hospital', 'clinic', 'status'])
+            if hasattr(instance, 'schedule'):
+                try:
+                    instance.schedule.delete()
+                except Exception:
+                    pass
 
         log_audit_event(
             action="DOCTOR_DELETED",
@@ -149,6 +172,7 @@ class FacilityDoctorDetailView(generics.RetrieveUpdateDestroyAPIView):
             actor=self.request.user,
             change_summary={
                 "name": doctor_name,
+                "facility_type": fac_type,
             },
             request=self.request
         )

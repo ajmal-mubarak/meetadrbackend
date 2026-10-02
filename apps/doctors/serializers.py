@@ -118,6 +118,7 @@ class DoctorListSerializer(serializers.ModelSerializer):
     clinic_id = serializers.SerializerMethodField()
     clinic_name = serializers.SerializerMethodField()
     available_days = serializers.SerializerMethodField()
+    available_slots = serializers.SerializerMethodField()
 
     class Meta:
         model = Doctor
@@ -128,7 +129,7 @@ class DoctorListSerializer(serializers.ModelSerializer):
             'consultation_fee', 'status',
             'hospital_id', 'hospital_name', 'hospital_name_ar',
             'clinic_id', 'clinic_name',
-            'about', 'about_ar', 'education', 'available_days'
+            'about', 'about_ar', 'education', 'available_days', 'available_slots'
         ]
 
     def get_hospital_id(self, obj):
@@ -147,8 +148,13 @@ class DoctorListSerializer(serializers.ModelSerializer):
         return obj.clinic.name if obj.clinic else None
 
     def get_available_days(self, obj):
-        if hasattr(obj, 'schedule'):
+        if hasattr(obj, 'schedule') and obj.schedule:
             return obj.schedule.available_days
+        return []
+
+    def get_available_slots(self, obj):
+        if hasattr(obj, 'schedule') and obj.schedule:
+            return obj.schedule.standard_slots
         return []
 
 class DoctorDetailSerializer(DoctorListSerializer):

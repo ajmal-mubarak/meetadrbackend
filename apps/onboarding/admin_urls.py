@@ -3,7 +3,8 @@ from django.urls import path
 from apps.onboarding.views import (
     AdminProviderRequestListView,
     AdminProviderRequestDetailView,
-    AdminProviderRequestStatusView
+    AdminProviderRequestStatusView,
+    AdminResendInvitationView,
 )
 from apps.facilities.facility_views import (
     AdminProviderListView,
@@ -26,6 +27,7 @@ urlpatterns = [
     path('requests/', AdminProviderRequestListView.as_view(), name='admin_request_list'),
     path('requests/<uuid:pk>/', AdminProviderRequestDetailView.as_view(), name='admin_request_detail'),
     path('requests/<uuid:pk>/status/', AdminProviderRequestStatusView.as_view(), name='admin_request_status'),
+    path('requests/<uuid:pk>/resend-invitation/', AdminResendInvitationView.as_view(), name='admin_request_resend_invitation'),
 
     # Provider facilities global oversight: /api/v1/admin/providers/
     path('providers/', AdminProviderListView.as_view(), name='admin_provider_list'),

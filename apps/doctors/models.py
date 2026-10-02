@@ -62,24 +62,22 @@ class Doctor(models.Model):
         verbose_name = 'Doctor'
         verbose_name_plural = 'Doctors'
         constraints = [
-            # Doctor must belong to Hospital OR Clinic, strictly exclusive
+            # Doctor cannot belong to both Hospital and Clinic simultaneously
             models.CheckConstraint(
                 check=(
-                    models.Q(hospital__isnull=False, clinic__isnull=True) |
-                    models.Q(hospital__isnull=True, clinic__isnull=False)
+                    models.Q(hospital__isnull=True) |
+                    models.Q(clinic__isnull=True)
                 ),
-                name='doctor_must_belong_to_hospital_xor_clinic'
+                name='doctor_cannot_belong_to_both_hospital_and_clinic'
             )
         ]
 
     def clean(self):
         super().clean()
-        has_hosp = bool(self.hospital_id)
-        has_clinic = bool(self.clinic_id)
-        if not (has_hosp ^ has_clinic):
+        if self.hospital_id and self.clinic_id:
             from django.core.exceptions import ValidationError
             raise ValidationError(
-                "A doctor must belong to either a Hospital OR a Clinic, strictly exclusive."
+                "A doctor cannot belong to both a Hospital and a Clinic simultaneously."
             )
 
 

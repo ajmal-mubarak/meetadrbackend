@@ -12,19 +12,22 @@ from apps.accounts.models import UserRole, PatientProfile, PatientDependent
 from apps.accounts.permissions import IsPatient, IsDoctor, IsFacilityAdmin, IsPlatformAdmin
 from apps.facilities.models import FacilityStatus
 from apps.doctors.models import Doctor
-from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview
+from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview, FacilityReview
 from apps.appointments.serializers import (
     AppointmentCreateSerializer,
     AppointmentCancelSerializer,
     AppointmentStatusUpdateSerializer,
     AppointmentDetailSerializer,
     DoctorReviewCreateSerializer,
-    DoctorReviewDetailSerializer
+    DoctorReviewDetailSerializer,
+    FacilityReviewCreateSerializer,
+    FacilityReviewDetailSerializer
 )
 from apps.appointments.services import recalculate_doctor_rating
 from apps.audit.utils import log_audit_event
 from apps.notifications.services import (
     notify_appointment_booked,
+    notify_appointment_confirmed,
     notify_appointment_cancelled,
     notify_appointment_completed,
     notify_review_submitted,
@@ -114,11 +117,32 @@ class AppointmentBookingView(views.APIView):
 
         standard_slots = schedule.standard_slots or []
         if time_slot not in standard_slots:
-            return Response({
-                "error": "ValidationError",
-                "code": "INVALID_SLOT",
-                "message": f"'{time_slot}' is not a valid consultation time slot for this doctor."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            def _normalize_time(t_str):
+                import re
+                start = t_str.split('-')[0].strip()
+                m = re.match(r'^(\d{1,2}):(\d{2})\s*(AM|PM)?$', start, re.IGNORECASE)
+                if not m:
+                    return None
+                hr, mn, mer = int(m.group(1)), int(m.group(2)), (m.group(3) or '').upper()
+                if mer == 'PM' and hr < 12: hr += 12
+                if mer == 'AM' and hr == 12: hr = 0
+                return (hr, mn)
+
+            norm_input = _normalize_time(time_slot)
+            matched_slot = None
+            if norm_input:
+                for s in standard_slots:
+                    if _normalize_time(s) == norm_input:
+                        matched_slot = s
+                        break
+            if matched_slot:
+                time_slot = matched_slot
+            else:
+                return Response({
+                    "error": "ValidationError",
+                    "code": "INVALID_SLOT",
+                    "message": f"'{time_slot}' is not a valid consultation time slot for this doctor."
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         # 3. Patient Identity Resolution (Self vs Dependent)
         profile, _ = PatientProfile.objects.get_or_create(user=request.user)
@@ -312,6 +336,13 @@ class AppointmentCancelView(views.APIView):
                 "message": "Cannot cancel a consultation that has already been completed."
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        if role == UserRole.PATIENT and appointment.status == AppointmentStatus.CONFIRMED:
+            return Response({
+                "error": "ValidationError",
+                "code": "CANNOT_CANCEL_CONFIRMED",
+                "message": "Confirmed consultations cannot be cancelled directly by patients. Please contact the medical facility or reschedule."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = AppointmentCancelSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         reason = serializer.validated_data.get('reason', 'Cancelled by user')
@@ -345,8 +376,168 @@ class AppointmentCancelView(views.APIView):
 
         return Response(AppointmentDetailSerializer(appointment).data, status=status.HTTP_200_OK)
 
+class AppointmentRescheduleView(views.APIView):
+    """
+    Reschedule an existing appointment to a new date and time slot.
+    Authorized for owning Patient, attending Doctor, facility Administrator, or Platform Admin.
+    Updates the existing appointment in place without creating a duplicate record.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        appointment = Appointment.objects.select_related(
+            'doctor', 'doctor__schedule', 'hospital', 'clinic', 'booked_by'
+        ).filter(id=pk).first()
+
+        if not appointment:
+            raise NotFound("Appointment not found.")
+
+        user = request.user
+        role = user.role
+        is_authorized = False
+
+        if role == UserRole.PATIENT:
+            is_authorized = (appointment.booked_by_id == user.id)
+        elif role == UserRole.DOCTOR:
+            is_authorized = hasattr(user, 'doctor_profile') and (appointment.doctor_id == user.doctor_profile.id)
+        elif role == UserRole.HOSPITAL:
+            if hasattr(user, 'hospital_facility') and user.hospital_facility:
+                is_authorized = (appointment.hospital_id == user.hospital_facility.id)
+            elif hasattr(user, 'clinic_facility') and user.clinic_facility:
+                is_authorized = (appointment.clinic_id == user.clinic_facility.id)
+        elif role == UserRole.ADMIN or user.is_staff or user.is_superuser:
+            is_authorized = True
+
+        if not is_authorized:
+            raise NotFound("Appointment not found.")
+
+        if appointment.status == AppointmentStatus.CANCELLED:
+            return Response({
+                "error": "ValidationError",
+                "code": "CANNOT_RESCHEDULE_CANCELLED",
+                "message": "Cannot reschedule an appointment that has been cancelled."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if appointment.status == AppointmentStatus.COMPLETED:
+            return Response({
+                "error": "ValidationError",
+                "code": "CANNOT_RESCHEDULE_COMPLETED",
+                "message": "Cannot reschedule an appointment that has already been completed."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        date_val = request.data.get('date')
+        slot_val = request.data.get('time_slot')
+
+        if not date_val or not slot_val:
+            return Response({
+                "error": "ValidationError",
+                "code": "MISSING_PARAMETERS",
+                "message": "Both 'date' (YYYY-MM-DD) and 'time_slot' are required to reschedule."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        from datetime import datetime, date as date_class
+        try:
+            if isinstance(date_val, str):
+                target_date = datetime.strptime(date_val.strip(), '%Y-%m-%d').date()
+            else:
+                target_date = date_val
+        except (ValueError, TypeError):
+            return Response({
+                "error": "ValidationError",
+                "code": "INVALID_DATE_FORMAT",
+                "message": "Invalid date format. Expected YYYY-MM-DD."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if target_date < date_class.today():
+            return Response({
+                "error": "ValidationError",
+                "code": "INVALID_DATE",
+                "message": "Cannot schedule appointments for past dates."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        doctor = appointment.doctor
+        day_name = target_date.strftime('%A')
+        schedule = getattr(doctor, 'schedule', None)
+
+        if not schedule or day_name not in schedule.available_days:
+            return Response({
+                "error": "ValidationError",
+                "code": "DOCTOR_UNAVAILABLE",
+                "message": f"Dr. {doctor.name} is not available on {day_name}s."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        time_slot = str(slot_val).strip()
+        standard_slots = schedule.standard_slots or []
+        if time_slot not in standard_slots:
+            def _normalize_time(t_str):
+                import re
+                start = t_str.split('-')[0].strip()
+                m = re.match(r'^(\d{1,2}):(\d{2})\s*(AM|PM)?$', start, re.IGNORECASE)
+                if not m:
+                    return None
+                hr, mn, mer = int(m.group(1)), int(m.group(2)), (m.group(3) or '').upper()
+                if mer == 'PM' and hr < 12: hr += 12
+                if mer == 'AM' and hr == 12: hr = 0
+                return (hr, mn)
+
+            norm_input = _normalize_time(time_slot)
+            matched_slot = None
+            if norm_input:
+                for s in standard_slots:
+                    if _normalize_time(s) == norm_input:
+                        matched_slot = s
+                        break
+            if matched_slot:
+                time_slot = matched_slot
+            else:
+                return Response({
+                    "error": "ValidationError",
+                    "code": "INVALID_SLOT",
+                    "message": f"'{time_slot}' is not a valid consultation time slot for this doctor."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check collision with other active appointments (excluding this appointment itself)
+        collision = Appointment.objects.filter(
+            doctor=doctor,
+            date=target_date,
+            time_slot=time_slot
+        ).exclude(id=appointment.id).exclude(status=AppointmentStatus.CANCELLED).exists()
+
+        if collision:
+            return Response({
+                "error": "ConflictError",
+                "code": "SLOT_ALREADY_BOOKED",
+                "message": f"The selected time slot ({time_slot}) on {target_date} is already booked."
+            }, status=status.HTTP_409_CONFLICT)
+
+        old_date = appointment.date
+        old_slot = appointment.time_slot
+
+        with transaction.atomic():
+            appointment.date = target_date
+            appointment.time_slot = time_slot
+            appointment.status = AppointmentStatus.CONFIRMED
+            appointment.save(update_fields=['date', 'time_slot', 'status', 'updated_at'])
+
+        # Audit event
+        log_audit_event(
+            action="APPOINTMENT_RESCHEDULED",
+            target_model="Appointment",
+            target_id=str(appointment.id),
+            actor=user,
+            change_summary={
+                "previous_date": str(old_date),
+                "new_date": str(target_date),
+                "previous_slot": old_slot,
+                "new_slot": time_slot,
+            },
+            request=request
+        )
+
+        return Response(AppointmentDetailSerializer(appointment).data, status=status.HTTP_200_OK)
+
 class DoctorAppointmentListView(generics.ListAPIView):
-    """List appointments for the authenticated doctor."""
+    """List appointments for the authenticated doctor with status, date, and search filters."""
     permission_classes = [IsDoctor]
     serializer_class = AppointmentDetailSerializer
 
@@ -356,7 +547,7 @@ class DoctorAppointmentListView(generics.ListAPIView):
             doctor=doctor
         ).select_related(
             'doctor', 'hospital', 'clinic', 'patient_profile', 'dependent', 'cancelled_by_user', 'review'
-        ).order_by('date', 'time_slot')
+        ).order_by('-date', 'time_slot')
 
         status_param = self.request.query_params.get('status')
         if status_param and status_param.lower() != 'all':
@@ -366,10 +557,22 @@ class DoctorAppointmentListView(generics.ListAPIView):
         if date_param:
             queryset = queryset.filter(date=date_param.strip())
 
+        search_param = self.request.query_params.get('search')
+        if search_param:
+            search_param = search_param.strip()
+            queryset = queryset.filter(
+                Q(patient_name_snapshot__icontains=search_param) |
+                Q(patient_phone_snapshot__icontains=search_param) |
+                Q(patient_email_snapshot__icontains=search_param) |
+                Q(specialty_snapshot__icontains=search_param) |
+                Q(notes__icontains=search_param) |
+                Q(id__icontains=search_param)
+            )
+
         return queryset
 
 class DoctorAppointmentStatusView(views.APIView):
-    """Mark consultation completed or update status by attending doctor."""
+    """Mark consultation completed, confirmed, or cancelled by attending doctor."""
     permission_classes = [IsDoctor]
 
     def patch(self, request, pk):
@@ -383,7 +586,14 @@ class DoctorAppointmentStatusView(views.APIView):
         new_status = serializer.validated_data['status']
 
         # Enforce valid doctor transitions
-        if new_status == AppointmentStatus.COMPLETED:
+        if new_status == AppointmentStatus.CONFIRMED:
+            if appointment.status != AppointmentStatus.PENDING:
+                return Response({
+                    "error": "ValidationError",
+                    "code": "INVALID_TRANSITION",
+                    "message": f"Appointment is already '{appointment.status}'. Only pending appointments can be confirmed."
+                }, status=status.HTTP_400_BAD_REQUEST)
+        elif new_status == AppointmentStatus.COMPLETED:
             if appointment.status != AppointmentStatus.CONFIRMED:
                 return Response({
                     "error": "ValidationError",
@@ -406,7 +616,9 @@ class DoctorAppointmentStatusView(views.APIView):
             prev_status = appointment.status
             appointment.status = new_status
             appointment.save()
-            if new_status == AppointmentStatus.COMPLETED:
+            if new_status == AppointmentStatus.CONFIRMED:
+                notify_appointment_confirmed(appointment)
+            elif new_status == AppointmentStatus.COMPLETED:
                 notify_appointment_completed(appointment)
             elif new_status == AppointmentStatus.CANCELLED:
                 notify_appointment_cancelled(appointment, cancelled_by_user=request.user, reason=appointment.cancel_reason)
@@ -560,7 +772,9 @@ class HospitalAdminAppointmentStatusView(views.APIView):
             prev_status = appointment.status
             appointment.status = new_status
             appointment.save(update_fields=['status', 'updated_at'])
-            if new_status == AppointmentStatus.COMPLETED:
+            if new_status == AppointmentStatus.CONFIRMED:
+                notify_appointment_confirmed(appointment)
+            elif new_status == AppointmentStatus.COMPLETED:
                 notify_appointment_completed(appointment)
             elif new_status == AppointmentStatus.CANCELLED:
                 notify_appointment_cancelled(appointment, cancelled_by_user=user, reason=appointment.cancel_reason)
@@ -589,6 +803,9 @@ class AppointmentReviewView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
+        if request.data.get('review_type') == 'facility' or request.data.get('target') == 'facility':
+            return AppointmentFacilityReviewView().post(request, pk)
+
         if request.user.role != UserRole.PATIENT:
             raise PermissionDenied("Only authenticated patients can submit reviews.")
 
@@ -683,4 +900,120 @@ class AppointmentReviewView(views.APIView):
             raise NotFound("No review found for this appointment.")
 
         return Response(DoctorReviewDetailSerializer(review).data, status=status.HTTP_200_OK)
+
+
+class AppointmentFacilityReviewView(views.APIView):
+    """
+    Post-consultation verified facility (hospital or clinic) review endpoint.
+    POST /api/v1/appointments/<uuid:pk>/facility-review/ (Patient creates review)
+    GET /api/v1/appointments/<uuid:pk>/facility-review/ (Patient, Doctor, or Facility Admin reads review)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.role != UserRole.PATIENT:
+            raise PermissionDenied("Only authenticated patients can submit reviews.")
+
+        appointment = Appointment.objects.select_related('hospital', 'clinic', 'doctor', 'doctor__hospital', 'doctor__clinic', 'booked_by').filter(id=pk).first()
+        if not appointment or appointment.booked_by_id != request.user.id:
+            raise NotFound("Appointment not found.")
+
+        if appointment.status != AppointmentStatus.COMPLETED:
+            return Response({
+                "error": "ValidationError",
+                "code": "CANNOT_REVIEW_UNCOMPLETED",
+                "message": "Only completed appointments can be reviewed."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if FacilityReview.objects.filter(appointment=appointment).exists():
+            return Response({
+                "error": "ConflictError",
+                "code": "ALREADY_REVIEWED",
+                "message": "This appointment facility has already been reviewed."
+            }, status=status.HTTP_409_CONFLICT)
+
+        hospital = appointment.hospital or (appointment.doctor.hospital if appointment.doctor else None)
+        clinic = appointment.clinic or (appointment.doctor.clinic if appointment.doctor else None)
+
+        if not hospital and not clinic:
+            return Response({
+                "error": "ValidationError",
+                "code": "NO_FACILITY",
+                "message": "No hospital or clinic is affiliated with this appointment."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = FacilityReviewCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            if 'rating' in serializer.errors:
+                return Response({
+                    "error": "ValidationError",
+                    "code": "INVALID_RATING",
+                    "message": "Rating must be an integer between 1 and 5."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            err_msg = serializer.errors.get('comment', ['Invalid input.'])[0] if 'comment' in serializer.errors else "Invalid input."
+            return Response({
+                "error": "ValidationError",
+                "code": "INVALID_INPUT",
+                "message": err_msg
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                review = FacilityReview.objects.create(
+                    appointment=appointment,
+                    hospital=hospital if hospital else None,
+                    clinic=clinic if not hospital and clinic else None,
+                    patient=request.user,
+                    rating=serializer.validated_data['rating'],
+                    comment=serializer.validated_data.get('comment', ''),
+                )
+
+                log_audit_event(
+                    action="PATIENT_FACILITY_REVIEW_SUBMITTED",
+                    target_model="FacilityReview",
+                    target_id=str(review.id),
+                    actor=request.user,
+                    change_summary={
+                        "hospital_id": str(hospital.id) if hospital else None,
+                        "clinic_id": str(clinic.id) if clinic else None,
+                        "appointment_id": str(appointment.id),
+                        "rating": review.rating,
+                        "review_id": str(review.id),
+                    },
+                    request=request
+                )
+        except IntegrityError:
+            return Response({
+                "error": "ConflictError",
+                "code": "ALREADY_REVIEWED",
+                "message": "This appointment facility has already been reviewed."
+            }, status=status.HTTP_409_CONFLICT)
+
+        return Response(FacilityReviewDetailSerializer(review).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request, pk):
+        appointment = Appointment.objects.select_related(
+            'hospital', 'clinic', 'booked_by'
+        ).filter(id=pk).first()
+
+        if not appointment:
+            raise NotFound("Appointment not found.")
+
+        user = request.user
+        is_authorized = False
+
+        if user.role == UserRole.PATIENT and appointment.booked_by_id == user.id:
+            is_authorized = True
+        elif user.role in [UserRole.HOSPITAL, UserRole.ADMIN, UserRole.DOCTOR]:
+            is_authorized = True
+
+        if not is_authorized:
+            raise NotFound("Appointment not found.")
+
+        review = FacilityReview.objects.select_related('hospital', 'clinic').filter(appointment=appointment).first()
+        if not review:
+            raise NotFound("No facility review found for this appointment.")
+
+        return Response(FacilityReviewDetailSerializer(review).data, status=status.HTTP_200_OK)
+
 

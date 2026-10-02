@@ -28,6 +28,7 @@ class Hospital(models.Model):
     operating_hours_ar = models.CharField(max_length=128, blank=True)
     about = models.TextField()
     about_ar = models.TextField(blank=True)
+    insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
     emergency_available = models.BooleanField(default=False)
     status = models.CharField(
         max_length=16,
@@ -45,6 +46,14 @@ class Hospital(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        try:
+            from apps.facilities.translation_service import auto_translate_facility
+            auto_translate_facility(self)
+        except Exception:
+            pass
+        super().save(*args, **kwargs)
 
 class Clinic(models.Model):
     """Specialized outpatient medical center focusing on primary specialties."""
@@ -68,6 +77,7 @@ class Clinic(models.Model):
     operating_hours_ar = models.CharField(max_length=128, blank=True)
     about = models.TextField()
     about_ar = models.TextField(blank=True)
+    insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
     status = models.CharField(
         max_length=16,
         choices=FacilityStatus.choices,
@@ -84,6 +94,14 @@ class Clinic(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        try:
+            from apps.facilities.translation_service import auto_translate_facility
+            auto_translate_facility(self)
+        except Exception:
+            pass
+        super().save(*args, **kwargs)
 
 class FacilityDepartment(models.Model):
     """Clinical department or medical division within a hospital."""

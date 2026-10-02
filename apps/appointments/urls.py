@@ -5,12 +5,14 @@ from apps.appointments.views import (
     PatientAppointmentListView,
     AppointmentDetailView,
     AppointmentCancelView,
+    AppointmentRescheduleView,
     DoctorAppointmentListView,
     DoctorAppointmentStatusView,
     HospitalAdminAppointmentListView,
     HospitalAdminAppointmentCancelView,
     HospitalAdminAppointmentStatusView,
-    AppointmentReviewView
+    AppointmentReviewView,
+    AppointmentFacilityReviewView
 )
 
 app_name = 'appointments'
@@ -21,8 +23,10 @@ urlpatterns = [
     path('appointments/my/', PatientAppointmentListView.as_view(), name='my_appointments'),
     path('appointments/<uuid:pk>/', AppointmentDetailView.as_view(), name='appointment_detail'),
     path('appointments/<uuid:pk>/cancel/', AppointmentCancelView.as_view(), name='appointment_cancel'),
+    path('appointments/<uuid:pk>/reschedule/', AppointmentRescheduleView.as_view(), name='appointment_reschedule'),
     path('appointments/<uuid:pk>/complete/', DoctorAppointmentStatusView.as_view(), name='appointment_complete'),
     path('appointments/<uuid:pk>/review/', AppointmentReviewView.as_view(), name='appointment_review'),
+    path('appointments/<uuid:pk>/facility-review/', AppointmentFacilityReviewView.as_view(), name='appointment_facility_review'),
 
     # Doctor consultation workflows
     path('doctor/appointments/', DoctorAppointmentListView.as_view(), name='doctor_appointments'),

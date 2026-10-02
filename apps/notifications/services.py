@@ -73,8 +73,25 @@ def notify_appointment_booked(appointment):
             title="New Appointment Booked",
             description=f"New consultation booked for {appointment.date} at {appointment.time_slot}.",
             notification_type=NotificationType.APPOINTMENT,
-            link="/doctor/dashboard"
+            link="/doctor/bookings"
         )
+
+
+def notify_appointment_confirmed(appointment):
+    """
+    Notifies the patient when their appointment is confirmed by the doctor or clinic.
+    """
+    patient_user = appointment.booked_by
+    doc_name = _format_doctor_name(appointment.doctor)
+    facility = appointment.hospital or appointment.clinic
+    facility_name = facility.name if facility else "the medical facility"
+    create_notification(
+        user=patient_user,
+        title="Appointment Confirmed",
+        description=f"Your appointment with {doc_name} at {facility_name} for {appointment.date} at {appointment.time_slot} has been confirmed.",
+        notification_type=NotificationType.APPOINTMENT,
+        link="/patient/bookings"
+    )
 
 
 def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: str = ""):

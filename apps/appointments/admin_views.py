@@ -185,7 +185,7 @@ class AdminReportsView(views.APIView):
             {'status': 'Pending', 'count': status_map.get(AppointmentStatus.PENDING, 0)},
         ]
 
-        # By Specialty (top 10)
+        # By Specialty (top 10): from appointments if available, or registered doctors
         specialty_qs = appts_qs.values('specialty_snapshot').annotate(
             count=Count('id')
         ).order_by('-count')[:10]
@@ -193,6 +193,14 @@ class AdminReportsView(views.APIView):
             {'specialty': item['specialty_snapshot'], 'count': item['count']}
             for item in specialty_qs if item['specialty_snapshot']
         ]
+        if not by_specialty:
+            doc_specialties = Doctor.objects.values('specialty').annotate(
+                count=Count('id')
+            ).order_by('-count')[:10]
+            by_specialty = [
+                {'specialty': item['specialty'], 'count': item['count']}
+                for item in doc_specialties if item['specialty']
+            ]
 
         # By Doctor (top 10)
         doctor_qs = appts_qs.values('doctor__name').annotate(
@@ -217,6 +225,31 @@ class AdminReportsView(views.APIView):
             facility_list.append({'facility': c['clinic__name'], 'count': c['count']})
         facility_list.sort(key=lambda x: x['count'], reverse=True)
         by_hospital = facility_list[:10]
+
+        # Monthly Trend over the past 6 calendar months
+        AR_MONTHS = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+        monthly_trend = []
+        for i in range(5, -1, -1):
+            y = today.year
+            m = today.month - i
+            while m <= 0:
+                m += 12
+                y -= 1
+            m_start = date(y, m, 1)
+            if m == 12:
+                m_end = date(y + 1, 1, 1) - timedelta(days=1)
+            else:
+                m_end = date(y, m + 1, 1) - timedelta(days=1)
+
+            m_appts = appts_qs.filter(date__gte=m_start, date__lte=m_end)
+            m_bookings = m_appts.count()
+            m_consultations = m_appts.filter(status=AppointmentStatus.COMPLETED).count()
+            monthly_trend.append({
+                'monthEn': m_start.strftime('%b'),
+                'monthAr': AR_MONTHS[m],
+                'bookings': m_bookings,
+                'volume': m_consultations,
+            })
 
         # Gross Consultation Revenue (Gross completed visits)
         completed_fees = appts_qs.filter(
@@ -256,4 +289,5 @@ class AdminReportsView(views.APIView):
             'byDoctor': by_doctor,
             'byHospital': by_hospital,
             'recentActivity': recent_activity,
+            'monthlyTrend': monthly_trend,
         }, status=status.HTTP_200_OK)
