@@ -1,0 +1,4413 @@
+openapi: 3.0.3
+info:
+  title: MeetAdr Healthcare API
+  version: 1.0.0
+  description: Enterprise healthcare appointment booking and provider discovery platform.
+    Secured via short-lived JWT access tokens in the Authorization header (Bearer
+    <access_token>) and rotation-tracked refresh tokens in HttpOnly cookies.
+paths:
+  /api/hospital-admin/appointments/{id}/cancel/:
+    post:
+      operationId: hospital_admin_appointments_cancel_create
+      description: |-
+        Facility administrator cancellation endpoint for doctors in their facility.
+        POST /api/hospital-admin/appointments/{appointment_id}/cancel/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - hospital-admin
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/bookings/:
+    get:
+      operationId: v1_admin_bookings_list
+      description: |-
+        Platform administrator listing of all appointments platform-wide across Hospitals and Clinics.
+        GET /api/v1/admin/bookings/
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAppointmentDetailList'
+          description: ''
+  /api/v1/admin/bookings/{id}/cancel/:
+    post:
+      operationId: v1_admin_bookings_cancel_create
+      description: |-
+        Platform administrator global appointment cancellation endpoint.
+        POST /api/v1/admin/bookings/{id}/cancel/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/dashboard/:
+    get:
+      operationId: v1_admin_dashboard_retrieve
+      description: |-
+        Platform administrator analytics & operational reporting.
+        GET /api/v1/admin/reports/
+
+        Security & Privacy Invariant:
+        Platform-admin only. Never exposes individual patient PHI, clinical notes,
+        diagnoses, or prescriptions. All metrics are aggregated.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/doctors/:
+    get:
+      operationId: v1_admin_doctors_list
+      description: |-
+        Platform administrator listing of all registered Doctors across Hospitals and Clinics.
+        GET /api/v1/admin/doctors/
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminDoctorListList'
+          description: ''
+  /api/v1/admin/doctors/{id}/status/:
+    patch:
+      operationId: v1_admin_doctors_status_partial_update
+      description: |-
+        Platform administrator doctor activation/deactivation endpoint.
+        PATCH /api/v1/admin/doctors/{id}/status/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/providers/:
+    get:
+      operationId: v1_admin_providers_retrieve
+      description: |-
+        Platform administrator listing of all registered Hospitals and Clinics.
+        GET /api/v1/admin/providers/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/providers/{id}/status/:
+    patch:
+      operationId: v1_admin_providers_status_partial_update
+      description: |-
+        Platform administrator global facility activation/deactivation endpoint.
+        PATCH /api/v1/admin/providers/{id}/status/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/reports/:
+    get:
+      operationId: v1_admin_reports_retrieve
+      description: |-
+        Platform administrator analytics & operational reporting.
+        GET /api/v1/admin/reports/
+
+        Security & Privacy Invariant:
+        Platform-admin only. Never exposes individual patient PHI, clinical notes,
+        diagnoses, or prescriptions. All metrics are aggregated.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/requests/:
+    get:
+      operationId: v1_admin_requests_list
+      description: |-
+        Platform administrator listing of provider onboarding requests with faceted filtering.
+        GET /api/v1/admin/requests/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminProviderRequestList'
+          description: ''
+  /api/v1/admin/requests/{id}/:
+    get:
+      operationId: v1_admin_requests_retrieve
+      description: |-
+        Platform administrator single provider application inspection.
+        GET /api/v1/admin/requests/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProviderRequestList'
+          description: ''
+  /api/v1/admin/requests/{id}/resend-invitation/:
+    post:
+      operationId: v1_admin_requests_resend_invitation_create
+      description: |-
+        Regenerates a fresh setup invitation token for an approved provider and
+        returns the direct setup link so the admin can manually deliver it.
+
+        POST /api/v1/admin/requests/{id}/resend-invitation/
+
+        Security:
+        - Platform admin only.
+        - Only allowed for approved applications.
+        - Invalidates the previous token and creates a new 72-hour one.
+        - The raw token is returned ONCE in the response body (admin responsibility to deliver it).
+        - The raw token is never persisted; only its SHA-256 hash is stored.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/admin/requests/{id}/status/:
+    patch:
+      operationId: v1_admin_requests_status_partial_update
+      description: |-
+        Platform administrator application review and transition endpoint.
+        PATCH /api/v1/admin/requests/{id}/status/
+
+        Security & State Transition Invariants:
+        1. Only platform administrators can review applications.
+        2. Explicit transitions: pending -> approved, pending -> rejected.
+        3. Re-approving an already approved application is strictly prevented (idempotent / conflict protection).
+        4. Upon approval:
+           - Creates Hospital XOR Clinic (strictly exclusive).
+           - Facility initial status is set to 'Deactivated' per approved architecture.
+           - Provisions facility admin account with role='hospital' and unusable password.
+           - Generates single-use, 72-hour SHA-256 hashed setup token.
+           - Dispatches invitation email with one-time setup link.
+           - Records safe audit log without leaking tokens or credentials.
+        5. Upon rejection:
+           - Marks status as 'rejected'.
+           - Does NOT create any facility or administrator account.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/:
+    post:
+      operationId: v1_appointments_create
+      description: |-
+        Authenticated patient consultation booking endpoint.
+        Atomic concurrency-safe slot allocation preventing double-booking.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/{id}/:
+    get:
+      operationId: v1_appointments_retrieve
+      description: Retrieve details of a single appointment with object-level security.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/{id}/cancel/:
+    post:
+      operationId: v1_appointments_cancel_create
+      description: |-
+        Cancel an appointment.
+        Authorized for owning Patient, attending Doctor, facility Administrator, or Platform Admin.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/{id}/complete/:
+    post:
+      operationId: v1_appointments_complete_create
+      description: POST /api/v1/appointments/{id}/complete/ shortcut.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_appointments_complete_partial_update
+      description: Mark consultation completed, confirmed, or cancelled by attending
+        doctor.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/{id}/facility-review/:
+    get:
+      operationId: v1_appointments_facility_review_retrieve
+      description: |-
+        Post-consultation verified facility (hospital or clinic) review endpoint.
+        POST /api/v1/appointments/<uuid:pk>/facility-review/ (Patient creates review)
+        GET /api/v1/appointments/<uuid:pk>/facility-review/ (Patient, Doctor, or Facility Admin reads review)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: v1_appointments_facility_review_create
+      description: |-
+        Post-consultation verified facility (hospital or clinic) review endpoint.
+        POST /api/v1/appointments/<uuid:pk>/facility-review/ (Patient creates review)
+        GET /api/v1/appointments/<uuid:pk>/facility-review/ (Patient, Doctor, or Facility Admin reads review)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/{id}/reschedule/:
+    post:
+      operationId: v1_appointments_reschedule_create
+      description: |-
+        Reschedule an existing appointment to a new date and time slot.
+        Authorized for owning Patient, attending Doctor, facility Administrator, or Platform Admin.
+        Updates the existing appointment in place without creating a duplicate record.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/{id}/review/:
+    get:
+      operationId: v1_appointments_review_retrieve
+      description: |-
+        Post-consultation verified review endpoint.
+        POST /api/v1/appointments/<uuid:pk>/review/ (Patient creates review)
+        GET /api/v1/appointments/<uuid:pk>/review/ (Patient or attending Doctor reads review)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: v1_appointments_review_create
+      description: |-
+        Post-consultation verified review endpoint.
+        POST /api/v1/appointments/<uuid:pk>/review/ (Patient creates review)
+        GET /api/v1/appointments/<uuid:pk>/review/ (Patient or attending Doctor reads review)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/appointments/my/:
+    get:
+      operationId: v1_appointments_my_list
+      description: List appointments booked by the authenticated patient.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppointmentDetail'
+          description: ''
+  /api/v1/auth/login/:
+    post:
+      operationId: v1_auth_login_create
+      description: Authenticates credentials, generates JWT tokens and sets HttpOnly
+        cookie.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/logout/:
+    post:
+      operationId: v1_auth_logout_create
+      description: Revokes refresh token, adds jti to blacklist, and clears HttpOnly
+        cookie.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/me/:
+    get:
+      operationId: v1_auth_me_retrieve
+      description: Retrieves or updates authenticated user profile (/api/v1/auth/me/).
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_auth_me_partial_update
+      description: Retrieves or updates authenticated user profile (/api/v1/auth/me/).
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/provider-setup/complete/:
+    post:
+      operationId: v1_auth_provider_setup_complete_create
+      description: |-
+        Public password establishment endpoint for newly approved facility administrators.
+        POST /api/v1/auth/provider-setup/complete/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/provider-setup/validate/:
+    post:
+      operationId: v1_auth_provider_setup_validate_create
+      description: |-
+        Public validation endpoint for single-use provider administrator invitation tokens.
+        POST /api/v1/auth/provider-setup/validate/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/register/:
+    post:
+      operationId: v1_auth_register_create
+      description: Public patient registration endpoint.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: v1_auth_token_refresh_create
+      description: Exchanges valid refresh token for rotated refresh token and new
+        access token.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/clinics/:
+    get:
+      operationId: v1_clinics_list
+      description: |-
+        Public directory of specialized outpatient clinics with faceted filtering.
+        Filters: location, specialty, search keyword.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClinicList'
+          description: ''
+  /api/v1/clinics/{id}/:
+    get:
+      operationId: v1_clinics_retrieve
+      description: Detailed clinic profile with affiliated doctors roster.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClinicDetail'
+          description: ''
+  /api/v1/conditions/:
+    get:
+      operationId: v1_conditions_retrieve
+      description: Public A-Z Health Conditions directory with symptoms and specialty
+        mappings.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/conditions/{condition_id}/:
+    get:
+      operationId: v1_conditions_retrieve_2
+      description: Detailed medical condition information by unique slug ID.
+      parameters:
+      - in: path
+        name: condition_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctor/{id}/:
+    get:
+      operationId: v1_doctor_retrieve
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    put:
+      operationId: v1_doctor_update
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    patch:
+      operationId: v1_doctor_partial_update
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    delete:
+      operationId: v1_doctor_destroy
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/doctor/{id}/status/:
+    patch:
+      operationId: v1_doctor_status_partial_update
+      description: |-
+        Facility administrator doctor status toggling (Active / Deactivated).
+        PATCH /api/v1/facility/doctors/{id}/status/
+
+        Cross-Facility IDOR Protection:
+        Attempting to toggle status for a doctor from another facility returns 404 Not Found.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctor/appointments/:
+    get:
+      operationId: v1_doctor_appointments_list
+      description: List appointments for the authenticated doctor with status, date,
+        and search filters.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppointmentDetail'
+          description: ''
+  /api/v1/doctor/appointments/{id}/status/:
+    post:
+      operationId: v1_doctor_appointments_status_create
+      description: POST /api/v1/appointments/{id}/complete/ shortcut.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_doctor_appointments_status_partial_update
+      description: Mark consultation completed, confirmed, or cancelled by attending
+        doctor.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctor/dashboard/:
+    get:
+      operationId: v1_doctor_dashboard_retrieve
+      description: |-
+        Unified doctor clinical KPI metrics, weekly workload trend, and upcoming appointments.
+        Strictly scoped to consultations of the authenticated doctor.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctor/patients/:
+    get:
+      operationId: v1_doctor_patients_retrieve
+      description: |-
+        Roster of unique patients who have booked or completed consultations with the authenticated doctor.
+        Enforces strict doctor isolation and clinical privacy boundaries.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctor/patients/{patient_id}/profile/:
+    get:
+      operationId: v1_doctor_patients_profile_retrieve
+      description: |-
+        Allows a doctor to access a patient's medical profile IF AND ONLY IF an active clinical
+        encounter (Appointment confirmed or completed) exists between them.
+        Blocks arbitrary browsing of global patient records (404/403).
+      parameters:
+      - in: path
+        name: patient_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctor/schedule/:
+    get:
+      operationId: v1_doctor_schedule_retrieve
+      description: |-
+        Manage doctor practicing schedule and standard 30-min consultation slots.
+        GET auto-provisions default schedule if none exists yet.
+        PUT/PATCH updates practicing days, slots, and slot duration.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: v1_doctor_schedule_update
+      description: |-
+        Manage doctor practicing schedule and standard 30-min consultation slots.
+        GET auto-provisions default schedule if none exists yet.
+        PUT/PATCH updates practicing days, slots, and slot duration.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_doctor_schedule_partial_update
+      description: |-
+        Manage doctor practicing schedule and standard 30-min consultation slots.
+        GET auto-provisions default schedule if none exists yet.
+        PUT/PATCH updates practicing days, slots, and slot duration.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctors/:
+    get:
+      operationId: v1_doctors_list
+      description: |-
+        Public directory of accredited doctors with multi-parameter faceted filtering.
+        Filters: specialty, location, hospital, clinic, practicing day, rating, search keyword.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DoctorList'
+          description: ''
+  /api/v1/doctors/{id}/:
+    get:
+      operationId: v1_doctors_retrieve
+      description: Detailed doctor profile with full facility info and practicing
+        schedule.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorDetail'
+          description: ''
+  /api/v1/doctors/{id}/availability/:
+    get:
+      operationId: v1_doctors_availability_retrieve
+      description: |-
+        Dynamic consultation slot availability calculator for a specific date.
+        Eliminates race condition collisions by cross-referencing doctor schedule
+        against currently booked, non-cancelled appointments.
+        Strictly requires both Doctor AND affiliated Hospital/Clinic to be ACTIVE.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/doctors/{id}/reviews/:
+    get:
+      operationId: v1_doctors_reviews_list
+      description: |-
+        Public, read-only list of verified patient reviews for an active doctor.
+        Enforces active doctor and active facility discovery rules.
+        Guarantees strict reviewer anonymity.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDoctorPublicReviewList'
+          description: ''
+  /api/v1/facility/dashboard/:
+    get:
+      operationId: v1_facility_dashboard_retrieve
+      description: |-
+        Operational dashboard KPIs for the authenticated facility administrator.
+        GET /api/v1/facility/dashboard/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/facility/departments/:
+    get:
+      operationId: v1_facility_departments_retrieve
+      description: |-
+        Hospital clinical departments listing and creation.
+        GET /api/v1/hospital/departments/
+        POST /api/v1/hospital/departments/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: v1_facility_departments_create
+      description: |-
+        Hospital clinical departments listing and creation.
+        GET /api/v1/hospital/departments/
+        POST /api/v1/hospital/departments/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/facility/departments/{id}/:
+    get:
+      operationId: v1_facility_departments_retrieve_2
+      description: |-
+        Clinical department inspection, update, and deletion for hospital administrators.
+        GET /api/v1/facility/departments/{id}/
+        PATCH /api/v1/facility/departments/{id}/
+        DELETE /api/v1/facility/departments/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_facility_departments_partial_update
+      description: |-
+        Clinical department inspection, update, and deletion for hospital administrators.
+        GET /api/v1/facility/departments/{id}/
+        PATCH /api/v1/facility/departments/{id}/
+        DELETE /api/v1/facility/departments/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: v1_facility_departments_destroy
+      description: |-
+        Clinical department inspection, update, and deletion for hospital administrators.
+        GET /api/v1/facility/departments/{id}/
+        PATCH /api/v1/facility/departments/{id}/
+        DELETE /api/v1/facility/departments/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/facility/doctors/:
+    get:
+      operationId: v1_facility_doctors_list
+      description: |-
+        Facility administrator doctor listing and onboarding endpoint.
+        GET /api/v1/facility/doctors/
+        POST /api/v1/facility/doctors/
+
+        Security & Isolation Rules:
+        - Scoped strictly to doctors belonging to the authenticated administrator's facility.
+        - Creating a doctor derives the facility server-side from request.user.
+        - Client-supplied facility IDs in POST body are strictly stripped/ignored.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    post:
+      operationId: v1_facility_doctors_create
+      description: |-
+        Facility administrator doctor listing and onboarding endpoint.
+        GET /api/v1/facility/doctors/
+        POST /api/v1/facility/doctors/
+
+        Security & Isolation Rules:
+        - Scoped strictly to doctors belonging to the authenticated administrator's facility.
+        - Creating a doctor derives the facility server-side from request.user.
+        - Client-supplied facility IDs in POST body are strictly stripped/ignored.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+  /api/v1/facility/doctors/{id}/:
+    get:
+      operationId: v1_facility_doctors_retrieve
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    put:
+      operationId: v1_facility_doctors_update
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    patch:
+      operationId: v1_facility_doctors_partial_update
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    delete:
+      operationId: v1_facility_doctors_destroy
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/facility/doctors/{id}/status/:
+    patch:
+      operationId: v1_facility_doctors_status_partial_update
+      description: |-
+        Facility administrator doctor status toggling (Active / Deactivated).
+        PATCH /api/v1/facility/doctors/{id}/status/
+
+        Cross-Facility IDOR Protection:
+        Attempting to toggle status for a doctor from another facility returns 404 Not Found.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/facility/my-facility/:
+    get:
+      operationId: v1_facility_my_facility_retrieve
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: v1_facility_my_facility_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_facility_my_facility_partial_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/facility/settings/:
+    get:
+      operationId: v1_facility_settings_retrieve
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: v1_facility_settings_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_facility_settings_partial_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/health/:
+    get:
+      operationId: v1_health_retrieve
+      description: |-
+        Public lightweight container & orchestrator health check probe.
+        GET /api/v1/health/
+
+        Security & Privacy Invariant:
+        Never exposes database credentials, hostnames, environment variables,
+        or internal stack traces on failure.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospital/appointments/:
+    get:
+      operationId: v1_hospital_appointments_list
+      description: List appointments for doctors belonging to the authenticated hospital
+        or clinic.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppointmentDetail'
+          description: ''
+  /api/v1/hospital/appointments/{id}/cancel/:
+    post:
+      operationId: v1_hospital_appointments_cancel_create
+      description: |-
+        Facility administrator cancellation endpoint for doctors in their facility.
+        POST /api/hospital-admin/appointments/{appointment_id}/cancel/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospital/appointments/{id}/status/:
+    patch:
+      operationId: v1_hospital_appointments_status_partial_update
+      description: |-
+        Facility administrator status updates (confirming or completing appointments).
+        PATCH /api/v1/hospital/appointments/{id}/status/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospital/dashboard/:
+    get:
+      operationId: v1_hospital_dashboard_retrieve
+      description: |-
+        Operational dashboard KPIs for the authenticated facility administrator.
+        GET /api/v1/facility/dashboard/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospital/departments/:
+    get:
+      operationId: v1_hospital_departments_retrieve
+      description: |-
+        Hospital clinical departments listing and creation.
+        GET /api/v1/hospital/departments/
+        POST /api/v1/hospital/departments/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: v1_hospital_departments_create
+      description: |-
+        Hospital clinical departments listing and creation.
+        GET /api/v1/hospital/departments/
+        POST /api/v1/hospital/departments/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospital/departments/{id}/:
+    get:
+      operationId: v1_hospital_departments_retrieve_2
+      description: |-
+        Clinical department inspection, update, and deletion for hospital administrators.
+        GET /api/v1/facility/departments/{id}/
+        PATCH /api/v1/facility/departments/{id}/
+        DELETE /api/v1/facility/departments/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_hospital_departments_partial_update
+      description: |-
+        Clinical department inspection, update, and deletion for hospital administrators.
+        GET /api/v1/facility/departments/{id}/
+        PATCH /api/v1/facility/departments/{id}/
+        DELETE /api/v1/facility/departments/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    delete:
+      operationId: v1_hospital_departments_destroy
+      description: |-
+        Clinical department inspection, update, and deletion for hospital administrators.
+        GET /api/v1/facility/departments/{id}/
+        PATCH /api/v1/facility/departments/{id}/
+        DELETE /api/v1/facility/departments/{id}/
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/hospital/doctors/:
+    get:
+      operationId: v1_hospital_doctors_list
+      description: |-
+        Facility administrator doctor listing and onboarding endpoint.
+        GET /api/v1/facility/doctors/
+        POST /api/v1/facility/doctors/
+
+        Security & Isolation Rules:
+        - Scoped strictly to doctors belonging to the authenticated administrator's facility.
+        - Creating a doctor derives the facility server-side from request.user.
+        - Client-supplied facility IDs in POST body are strictly stripped/ignored.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    post:
+      operationId: v1_hospital_doctors_create
+      description: |-
+        Facility administrator doctor listing and onboarding endpoint.
+        GET /api/v1/facility/doctors/
+        POST /api/v1/facility/doctors/
+
+        Security & Isolation Rules:
+        - Scoped strictly to doctors belonging to the authenticated administrator's facility.
+        - Creating a doctor derives the facility server-side from request.user.
+        - Client-supplied facility IDs in POST body are strictly stripped/ignored.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+  /api/v1/hospital/doctors/{id}/:
+    get:
+      operationId: v1_hospital_doctors_retrieve
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    put:
+      operationId: v1_hospital_doctors_update
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FacilityDoctorRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    patch:
+      operationId: v1_hospital_doctors_partial_update
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFacilityDoctorRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacilityDoctor'
+          description: ''
+    delete:
+      operationId: v1_hospital_doctors_destroy
+      description: |-
+        Facility-scoped doctor inspection, updating, and de-registration.
+        GET /api/v1/facility/doctors/{id}/
+        PATCH /api/v1/facility/doctors/{id}/
+        DELETE /api/v1/facility/doctors/{id}/
+
+        Cross-Facility IDOR Protection:
+        Attempting to access, modify, or delete a doctor belonging to another facility
+        returns 404 Not Found to prevent resource enumeration and cross-facility leakage.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/hospital/doctors/{id}/status/:
+    patch:
+      operationId: v1_hospital_doctors_status_partial_update
+      description: |-
+        Facility administrator doctor status toggling (Active / Deactivated).
+        PATCH /api/v1/facility/doctors/{id}/status/
+
+        Cross-Facility IDOR Protection:
+        Attempting to toggle status for a doctor from another facility returns 404 Not Found.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospital/my-facility/:
+    get:
+      operationId: v1_hospital_my_facility_retrieve
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: v1_hospital_my_facility_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_hospital_my_facility_partial_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospital/settings/:
+    get:
+      operationId: v1_hospital_settings_retrieve
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: v1_hospital_settings_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_hospital_settings_partial_update
+      description: |-
+        Authenticated facility administrator inspection and update of their own facility.
+        GET /api/v1/facility/settings/
+        PATCH /api/v1/facility/settings/
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/hospitals/:
+    get:
+      operationId: v1_hospitals_list
+      description: |-
+        Public directory of accredited medical hospitals with faceted filtering.
+        Filters: location, emergency_available, specialty, search keyword.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HospitalList'
+          description: ''
+  /api/v1/hospitals/{id}/:
+    get:
+      operationId: v1_hospitals_retrieve
+      description: Detailed hospital profile with clinical departments and affiliated
+        doctors.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HospitalDetail'
+          description: ''
+  /api/v1/notifications/:
+    get:
+      operationId: v1_notifications_list
+      description: |-
+        Lists the authenticated user's notifications.
+        Strictly scoped to request.user.
+        Supports ?unread=true filtering.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /api/v1/notifications/{id}/:
+    delete:
+      operationId: v1_notifications_destroy
+      description: Deletes a single notification for the authenticated user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/notifications/{id}/read/:
+    patch:
+      operationId: v1_notifications_read_partial_update
+      description: |-
+        Marks a single notification as read for the authenticated user.
+        Strictly scoped to request.user; another user's UUID returns 404.
+        Operation is idempotent.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/notifications/clear-all/:
+    delete:
+      operationId: v1_notifications_clear_all_destroy
+      description: Clears all notifications for the authenticated user.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/notifications/read-all/:
+    post:
+      operationId: v1_notifications_read_all_create
+      description: |-
+        Bulk marks all unread notifications as read for the authenticated user.
+        Executes an atomic database UPDATE without affecting other users.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/notifications/unread-count/:
+    get:
+      operationId: v1_notifications_unread_count_retrieve
+      description: |-
+        Returns the real-time unread notification count for the authenticated user.
+        Executes a single direct SQL COUNT query without instantiating model rows.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/patient/appointments/:
+    get:
+      operationId: v1_patient_appointments_list
+      description: List appointments booked by the authenticated patient.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppointmentDetail'
+          description: ''
+  /api/v1/patient/dependents/:
+    get:
+      operationId: v1_patient_dependents_list
+      description: |-
+        CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
+        Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientDependent'
+          description: ''
+    post:
+      operationId: v1_patient_dependents_create
+      description: |-
+        CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
+        Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientDependentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatientDependentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatientDependentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDependent'
+          description: ''
+  /api/v1/patient/dependents/{id}/:
+    get:
+      operationId: v1_patient_dependents_retrieve
+      description: |-
+        CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
+        Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDependent'
+          description: ''
+    put:
+      operationId: v1_patient_dependents_update
+      description: |-
+        CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
+        Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientDependentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatientDependentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatientDependentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDependent'
+          description: ''
+    patch:
+      operationId: v1_patient_dependents_partial_update
+      description: |-
+        CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
+        Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPatientDependentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPatientDependentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPatientDependentRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientDependent'
+          description: ''
+    delete:
+      operationId: v1_patient_dependents_destroy
+      description: |-
+        CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
+        Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/patient/profile/:
+    get:
+      operationId: v1_patient_profile_retrieve
+      description: Direct access to authenticated patient's clinical profile.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    put:
+      operationId: v1_patient_profile_update
+      description: Direct access to authenticated patient's clinical profile.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+    patch:
+      operationId: v1_patient_profile_partial_update
+      description: Direct access to authenticated patient's clinical profile.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/prescriptions/:
+    post:
+      operationId: v1_prescriptions_create
+      description: |-
+        POST /api/v1/prescriptions/
+
+        Issues a structured digital prescription for a completed appointment.
+
+        Security Invariants:
+        - Only authenticated doctors with an active facility can issue prescriptions.
+        - Doctor identity is strictly derived from request.user (never client payload).
+        - Patient identity is strictly derived from appointment.booked_by.
+        - Appointment must belong to the requesting doctor and be in COMPLETED status.
+        - Appointment must not already have an ACTIVE prescription (returns 409).
+        - Concurrency-safe: database partial UniqueConstraint enforces 1 active Rx per appointment.
+        - Zero clinical PHI in audit logs.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/prescriptions/{id}/:
+    get:
+      operationId: v1_prescriptions_retrieve
+      description: |-
+        GET /api/v1/prescriptions/{id}/
+
+        Retrieves full details of a single prescription.
+
+        Security Invariants:
+        - Only owning patient, issuing doctor, or consulting doctor with active
+          clinical relationship may access.
+        - All other users receive 404 Not Found (fail closed, no disclosure).
+        - Facility administrators and platform administrators receive 404.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/prescriptions/{id}/cancel/:
+    post:
+      operationId: v1_prescriptions_cancel_create
+      description: |-
+        POST /api/v1/prescriptions/{id}/cancel/
+
+        Cancels an active prescription.
+
+        Lifecycle Invariants:
+        - Only the issuing doctor may cancel their prescription.
+        - Unauthorized doctors or other roles receive 404 Not Found.
+        - Record is NOT deleted and clinical data is NOT modified.
+        - Once cancelled, a replacement prescription may be issued for the same appointment.
+        - Audit event PRESCRIPTION_CANCELLED logged without clinical PHI.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/prescriptions/appointment/{appointment_id}/:
+    get:
+      operationId: v1_prescriptions_appointment_retrieve
+      description: |-
+        GET /api/v1/prescriptions/appointment/{appointment_id}/
+
+        Retrieves the ACTIVE prescription for a specific appointment.
+
+        Security Invariants:
+        - Only the owning patient or attending doctor may query.
+        - Historical cancelled prescriptions do not replace the active prescription.
+        - If no active prescription exists, returns 404 Not Found.
+        - Unrelated patients, unrelated doctors, and administrative roles receive 404.
+      parameters:
+      - in: path
+        name: appointment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/prescriptions/my/:
+    get:
+      operationId: v1_prescriptions_my_retrieve
+      description: |-
+        GET /api/v1/prescriptions/my/
+
+        Lists prescriptions for the authenticated caller:
+        - Patients see prescriptions issued for their account (including dependents).
+        - Doctors see prescriptions they have issued.
+        - Other roles receive 403 Forbidden (preventing clinical PHI exposure).
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/provider-requests/:
+    post:
+      operationId: v1_provider_requests_create
+      description: |-
+        Public submission endpoint for hospital and clinic partnership onboarding requests.
+        POST /api/v1/provider-requests/
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderRequestPublicCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProviderRequestPublicCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProviderRequestPublicCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderRequestPublicCreate'
+          description: ''
+  /api/v1/provider-requests/{id}/:
+    get:
+      operationId: v1_provider_requests_retrieve
+      description: |-
+        Public read-only status query for an application reference ID.
+        GET /api/v1/provider-requests/{id}/
+
+        Privacy Invariant:
+        Never exposes applicant email, phone, contact person, admin notes,
+        review actor, or internal facility/audit details.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderRequestPublicStatus'
+          description: ''
+  /api/v1/specialties/:
+    get:
+      operationId: v1_specialties_retrieve
+      description: Returns list of distinct active medical specialties available across
+        the platform.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    AdminDoctorList:
+      type: object
+      description: |-
+        Platform-wide admin serializer for Doctor management.
+        Provides camelCase aliases for the AdminDoctors frontend contract while preserving
+        snake_case attributes and relational facility details.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        specialty:
+          type: string
+          maxLength: 128
+        special_interests: {}
+        experience_years:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        experience_text:
+          type: string
+          maxLength: 64
+        experience_text_ar:
+          type: string
+          maxLength: 64
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        review_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        location:
+          type: string
+          maxLength: 128
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+        status:
+          $ref: '#/components/schemas/Status57cEnum'
+        hospital_id:
+          type: string
+          readOnly: true
+        hospital_name:
+          type: string
+          readOnly: true
+        hospital_name_ar:
+          type: string
+          readOnly: true
+        clinic_id:
+          type: string
+          readOnly: true
+        clinic_name:
+          type: string
+          readOnly: true
+        about:
+          type: string
+        about_ar:
+          type: string
+        education:
+          type: string
+          maxLength: 255
+        available_days:
+          type: string
+          readOnly: true
+        available_slots:
+          type: string
+          readOnly: true
+        experience:
+          type: string
+          readOnly: true
+        hospitalName:
+          type: string
+          readOnly: true
+        clinicName:
+          type: string
+          readOnly: true
+        hospitalId:
+          type: string
+          readOnly: true
+        clinicId:
+          type: string
+          readOnly: true
+        consultationFee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          readOnly: true
+        reviewCount:
+          type: integer
+          readOnly: true
+        specialInterest:
+          readOnly: true
+        availableDays:
+          type: string
+          readOnly: true
+        availableSlots:
+          type: string
+          readOnly: true
+      required:
+      - availableDays
+      - availableSlots
+      - available_days
+      - available_slots
+      - clinicId
+      - clinicName
+      - clinic_id
+      - clinic_name
+      - consultationFee
+      - experience
+      - hospitalId
+      - hospitalName
+      - hospital_id
+      - hospital_name
+      - hospital_name_ar
+      - id
+      - location
+      - name
+      - reviewCount
+      - specialInterest
+      - specialty
+    AdminProviderRequestList:
+      type: object
+      description: Platform administrator view of provider onboarding applications.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        provider_type:
+          allOf:
+          - $ref: '#/components/schemas/ProviderTypeEnum'
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        name_ar:
+          type: string
+          readOnly: true
+        contact_person:
+          type: string
+          readOnly: true
+        contact_number:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        country:
+          type: string
+          readOnly: true
+        location:
+          type: string
+          readOnly: true
+        address:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEf1Enum'
+          readOnly: true
+        admin_notes:
+          type: string
+          readOnly: true
+        reviewed_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        reviewed_by_email:
+          type: string
+          readOnly: true
+        reviewed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        facility_id:
+          type: string
+          readOnly: true
+        facility_name:
+          type: string
+          readOnly: true
+      required:
+      - address
+      - admin_notes
+      - contact_number
+      - contact_person
+      - country
+      - email
+      - facility_id
+      - facility_name
+      - id
+      - location
+      - name
+      - name_ar
+      - provider_type
+      - reviewed_at
+      - reviewed_by
+      - reviewed_by_email
+      - status
+      - submitted_at
+    AppointmentDetail:
+      type: object
+      description: |-
+        Comprehensive, frontend-compatible appointment representation.
+        Supports both snake_case and camelCase field access.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        date:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/AppointmentDetailStatusEnum'
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        patient_name_snapshot:
+          type: string
+          maxLength: 255
+        patient_phone_snapshot:
+          type: string
+          maxLength: 32
+        patient_email_snapshot:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        specialty_snapshot:
+          type: string
+          maxLength: 128
+        time_slot:
+          type: string
+          maxLength: 32
+        cancel_reason:
+          type: string
+        cancelled_by_role:
+          type: string
+          maxLength: 16
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_dependent:
+          type: string
+          readOnly: true
+        dependent_id:
+          type: string
+          readOnly: true
+        is_reviewed:
+          type: string
+          readOnly: true
+        review:
+          type: string
+          readOnly: true
+        is_doctor_reviewed:
+          type: string
+          readOnly: true
+        is_facility_reviewed:
+          type: string
+          readOnly: true
+        doctor_review:
+          type: string
+          readOnly: true
+        facility_review:
+          type: string
+          readOnly: true
+        patientId:
+          type: string
+          readOnly: true
+        patientName:
+          type: string
+          readOnly: true
+        patientPhone:
+          type: string
+          readOnly: true
+        patientMobile:
+          type: string
+          readOnly: true
+        patientEmail:
+          type: string
+          readOnly: true
+        doctorId:
+          type: string
+          readOnly: true
+        doctorName:
+          type: string
+          readOnly: true
+        doctorPhoto:
+          type: string
+          readOnly: true
+        hospitalId:
+          type: string
+          readOnly: true
+        clinicId:
+          type: string
+          readOnly: true
+        providerName:
+          type: string
+          readOnly: true
+        facilityName:
+          type: string
+          readOnly: true
+        hospitalName:
+          type: string
+          readOnly: true
+        specialty:
+          type: string
+          readOnly: true
+        location:
+          type: string
+          readOnly: true
+        time:
+          type: string
+          readOnly: true
+        timeSlot:
+          type: string
+          readOnly: true
+        cancelReason:
+          type: string
+          readOnly: true
+        cancelledBy:
+          type: string
+          readOnly: true
+        cancelledByName:
+          type: string
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        isDoctorReviewed:
+          type: string
+          readOnly: true
+        isFacilityReviewed:
+          type: string
+          readOnly: true
+        doctorReview:
+          type: string
+          readOnly: true
+        facilityReview:
+          type: string
+          readOnly: true
+      required:
+      - cancelReason
+      - cancelledBy
+      - cancelledByName
+      - clinicId
+      - createdAt
+      - created_at
+      - date
+      - dependent_id
+      - doctorId
+      - doctorName
+      - doctorPhoto
+      - doctorReview
+      - doctor_review
+      - facilityName
+      - facilityReview
+      - facility_review
+      - hospitalId
+      - hospitalName
+      - id
+      - isDoctorReviewed
+      - isFacilityReviewed
+      - is_dependent
+      - is_doctor_reviewed
+      - is_facility_reviewed
+      - is_reviewed
+      - location
+      - patientEmail
+      - patientId
+      - patientMobile
+      - patientName
+      - patientPhone
+      - patient_name_snapshot
+      - providerName
+      - review
+      - specialty
+      - specialty_snapshot
+      - time
+      - timeSlot
+      - time_slot
+    AppointmentDetailStatusEnum:
+      enum:
+      - pending
+      - confirmed
+      - completed
+      - cancelled
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `confirmed` - Confirmed
+        * `completed` - Completed
+        * `cancelled` - Cancelled
+    BlankEnum:
+      enum:
+      - ''
+    BloodGroupEnum:
+      enum:
+      - A+
+      - A-
+      - B+
+      - B-
+      - AB+
+      - AB-
+      - O+
+      - O-
+      type: string
+      description: |-
+        * `A+` - A+
+        * `A-` - A-
+        * `B+` - B+
+        * `B-` - B-
+        * `AB+` - AB+
+        * `AB-` - AB-
+        * `O+` - O+
+        * `O-` - O-
+    ClinicDetail:
+      type: object
+      description: Detailed clinic profile including affiliated active doctors.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        location:
+          type: string
+          maxLength: 128
+        address:
+          type: string
+        address_ar:
+          type: string
+        primary_specialty:
+          type: string
+          maxLength: 128
+        phone:
+          type: string
+          maxLength: 32
+        operating_hours:
+          type: string
+          maxLength: 128
+        operating_hours_ar:
+          type: string
+          maxLength: 128
+        about:
+          type: string
+        about_ar:
+          type: string
+        status:
+          $ref: '#/components/schemas/Status57cEnum'
+        doctor_count:
+          type: string
+          readOnly: true
+        avg_rating:
+          type: string
+          readOnly: true
+        total_reviews:
+          type: string
+          readOnly: true
+        doctors:
+          type: string
+          readOnly: true
+      required:
+      - about
+      - address
+      - avg_rating
+      - doctor_count
+      - doctors
+      - id
+      - location
+      - name
+      - operating_hours
+      - phone
+      - primary_specialty
+      - total_reviews
+    ClinicList:
+      type: object
+      description: Public list serializer for specialized outpatient clinics.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        location:
+          type: string
+          maxLength: 128
+        address:
+          type: string
+        address_ar:
+          type: string
+        primary_specialty:
+          type: string
+          maxLength: 128
+        phone:
+          type: string
+          maxLength: 32
+        operating_hours:
+          type: string
+          maxLength: 128
+        operating_hours_ar:
+          type: string
+          maxLength: 128
+        about:
+          type: string
+        about_ar:
+          type: string
+        status:
+          $ref: '#/components/schemas/Status57cEnum'
+        doctor_count:
+          type: string
+          readOnly: true
+        avg_rating:
+          type: string
+          readOnly: true
+        total_reviews:
+          type: string
+          readOnly: true
+      required:
+      - about
+      - address
+      - avg_rating
+      - doctor_count
+      - id
+      - location
+      - name
+      - operating_hours
+      - phone
+      - primary_specialty
+      - total_reviews
+    DoctorDetail:
+      type: object
+      description: Detailed doctor profile with full facility context and schedule.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        specialty:
+          type: string
+          maxLength: 128
+        special_interests: {}
+        experience_years:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        experience_text:
+          type: string
+          maxLength: 64
+        experience_text_ar:
+          type: string
+          maxLength: 64
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        review_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        location:
+          type: string
+          maxLength: 128
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+        status:
+          $ref: '#/components/schemas/Status57cEnum'
+        hospital_id:
+          type: string
+          readOnly: true
+        hospital_name:
+          type: string
+          readOnly: true
+        hospital_name_ar:
+          type: string
+          readOnly: true
+        clinic_id:
+          type: string
+          readOnly: true
+        clinic_name:
+          type: string
+          readOnly: true
+        about:
+          type: string
+        about_ar:
+          type: string
+        education:
+          type: string
+          maxLength: 255
+        available_days:
+          type: string
+          readOnly: true
+        available_slots:
+          type: string
+          readOnly: true
+        schedule:
+          allOf:
+          - $ref: '#/components/schemas/DoctorSchedule'
+          readOnly: true
+        facility_details:
+          type: string
+          readOnly: true
+      required:
+      - available_days
+      - available_slots
+      - clinic_id
+      - clinic_name
+      - facility_details
+      - hospital_id
+      - hospital_name
+      - hospital_name_ar
+      - id
+      - location
+      - name
+      - schedule
+      - specialty
+    DoctorList:
+      type: object
+      description: Public list serializer for doctor directory with faceted search
+        fields.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        specialty:
+          type: string
+          maxLength: 128
+        special_interests: {}
+        experience_years:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        experience_text:
+          type: string
+          maxLength: 64
+        experience_text_ar:
+          type: string
+          maxLength: 64
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        review_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        location:
+          type: string
+          maxLength: 128
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+        status:
+          $ref: '#/components/schemas/Status57cEnum'
+        hospital_id:
+          type: string
+          readOnly: true
+        hospital_name:
+          type: string
+          readOnly: true
+        hospital_name_ar:
+          type: string
+          readOnly: true
+        clinic_id:
+          type: string
+          readOnly: true
+        clinic_name:
+          type: string
+          readOnly: true
+        about:
+          type: string
+        about_ar:
+          type: string
+        education:
+          type: string
+          maxLength: 255
+        available_days:
+          type: string
+          readOnly: true
+        available_slots:
+          type: string
+          readOnly: true
+      required:
+      - available_days
+      - available_slots
+      - clinic_id
+      - clinic_name
+      - hospital_id
+      - hospital_name
+      - hospital_name_ar
+      - id
+      - location
+      - name
+      - specialty
+    DoctorPublicReview:
+      type: object
+      description: |-
+        Public sanitized review serializer.
+        Guarantees strict patient anonymity and zero PII or appointment linkage.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        rating:
+          type: integer
+          readOnly: true
+        comment:
+          type: string
+          readOnly: true
+        patientDisplayName:
+          type: string
+          readOnly: true
+        patient_display_name:
+          type: string
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - comment
+      - createdAt
+      - created_at
+      - id
+      - patientDisplayName
+      - patient_display_name
+      - rating
+    DoctorSchedule:
+      type: object
+      description: Doctor availability schedule and standard slot duration.
+      properties:
+        available_days:
+          description: List of active weekdays, e.g. ['Monday', 'Tuesday', 'Wednesday']
+        availableDays:
+          readOnly: true
+        standard_slots:
+          description: List of active consultation intervals, e.g. ['09:00 - 09:30',
+            '09:30 - 10:00']
+        standardSlots:
+          readOnly: true
+        slot_duration_minutes:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        slotDurationMinutes:
+          type: integer
+          readOnly: true
+      required:
+      - availableDays
+      - slotDurationMinutes
+      - standardSlots
+    FacilityDepartment:
+      type: object
+      description: Clinical department within an accredited hospital.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 128
+        head_of_department:
+          type: string
+          maxLength: 255
+        bed_capacity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+      required:
+      - id
+      - name
+    FacilityDoctor:
+      type: object
+      description: |-
+        Facility-scoped doctor management serializer.
+
+        Security & Domain Invariants:
+        1. Facility assignment is strictly derived from the authenticated administrator.
+        2. Client-supplied hospitalId, clinicId, or facilityId are strictly rejected/ignored.
+        3. Reassignment across facilities is strictly forbidden.
+        4. XOR invariant (Hospital XOR Clinic) is enforced server-side.
+        5. Ratings, review counts, and status cannot be mass-assigned.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        specialty:
+          type: string
+          maxLength: 128
+        special_interests: {}
+        experience_years:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        experience_text:
+          type: string
+          maxLength: 64
+        experience_text_ar:
+          type: string
+          maxLength: 64
+        education:
+          type: string
+          maxLength: 255
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+        location:
+          type: string
+          maxLength: 128
+        about:
+          type: string
+        about_ar:
+          type: string
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          readOnly: true
+        review_count:
+          type: integer
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status57cEnum'
+          readOnly: true
+        facility_id:
+          type: string
+          readOnly: true
+        facility_name:
+          type: string
+          readOnly: true
+        facility_type:
+          type: string
+          readOnly: true
+        available_days:
+          type: array
+          items:
+            type: string
+          default:
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Saturday
+        standard_slots:
+          type: array
+          items:
+            type: string
+          default:
+          - 09:00 - 09:30
+          - 09:30 - 10:00
+          - 10:00 - 10:30
+          - 11:00 - 11:30
+          - 14:00 - 14:30
+          - 15:00 - 15:30
+        slot_duration_minutes:
+          type: integer
+          default: 30
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - facility_id
+      - facility_name
+      - facility_type
+      - id
+      - name
+      - rating
+      - review_count
+      - specialty
+      - status
+      - updated_at
+    FacilityDoctorRequest:
+      type: object
+      description: |-
+        Facility-scoped doctor management serializer.
+
+        Security & Domain Invariants:
+        1. Facility assignment is strictly derived from the authenticated administrator.
+        2. Client-supplied hospitalId, clinicId, or facilityId are strictly rejected/ignored.
+        3. Reassignment across facilities is strictly forbidden.
+        4. XOR invariant (Hospital XOR Clinic) is enforced server-side.
+        5. Ratings, review counts, and status cannot be mass-assigned.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        specialty:
+          type: string
+          minLength: 1
+          maxLength: 128
+        special_interests: {}
+        experience_years:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        experience_text:
+          type: string
+          maxLength: 64
+        experience_text_ar:
+          type: string
+          maxLength: 64
+        education:
+          type: string
+          maxLength: 255
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+        location:
+          type: string
+          maxLength: 128
+        about:
+          type: string
+        about_ar:
+          type: string
+        available_days:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          default:
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Saturday
+        standard_slots:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          default:
+          - 09:00 - 09:30
+          - 09:30 - 10:00
+          - 10:00 - 10:30
+          - 11:00 - 11:30
+          - 14:00 - 14:30
+          - 15:00 - 15:30
+        slot_duration_minutes:
+          type: integer
+          default: 30
+      required:
+      - name
+      - specialty
+    HospitalDetail:
+      type: object
+      description: Detailed hospital profile including clinical departments and affiliated
+        doctors.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        location:
+          type: string
+          maxLength: 128
+        address:
+          type: string
+        address_ar:
+          type: string
+        phone:
+          type: string
+          maxLength: 32
+        operating_hours:
+          type: string
+          maxLength: 128
+        operating_hours_ar:
+          type: string
+          maxLength: 128
+        about:
+          type: string
+        about_ar:
+          type: string
+        emergency_available:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/Status57cEnum'
+        doctor_count:
+          type: string
+          readOnly: true
+        specialties:
+          type: string
+          readOnly: true
+        avg_rating:
+          type: string
+          readOnly: true
+        total_reviews:
+          type: string
+          readOnly: true
+        departments:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacilityDepartment'
+          readOnly: true
+        doctors:
+          type: string
+          readOnly: true
+      required:
+      - about
+      - address
+      - avg_rating
+      - departments
+      - doctor_count
+      - doctors
+      - id
+      - location
+      - name
+      - operating_hours
+      - phone
+      - specialties
+      - total_reviews
+    HospitalList:
+      type: object
+      description: Public list serializer for accredited hospitals.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        location:
+          type: string
+          maxLength: 128
+        address:
+          type: string
+        address_ar:
+          type: string
+        phone:
+          type: string
+          maxLength: 32
+        operating_hours:
+          type: string
+          maxLength: 128
+        operating_hours_ar:
+          type: string
+          maxLength: 128
+        about:
+          type: string
+        about_ar:
+          type: string
+        emergency_available:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/Status57cEnum'
+        doctor_count:
+          type: string
+          readOnly: true
+        specialties:
+          type: string
+          readOnly: true
+        avg_rating:
+          type: string
+          readOnly: true
+        total_reviews:
+          type: string
+          readOnly: true
+      required:
+      - about
+      - address
+      - avg_rating
+      - doctor_count
+      - id
+      - location
+      - name
+      - operating_hours
+      - phone
+      - specialties
+      - total_reviews
+    Notification:
+      type: object
+      description: Serializer mapping Notification model to frontend PatientNotification
+        contract.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        notificationType:
+          type: string
+          readOnly: true
+        type:
+          type: string
+          readOnly: true
+        link:
+          type: string
+          readOnly: true
+        isRead:
+          type: boolean
+          readOnly: true
+        unread:
+          type: boolean
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        time:
+          type: string
+          readOnly: true
+      required:
+      - createdAt
+      - description
+      - id
+      - isRead
+      - link
+      - notificationType
+      - time
+      - title
+      - type
+      - unread
+    PaginatedAdminDoctorListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminDoctorList'
+    PaginatedAppointmentDetailList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppointmentDetail'
+    PaginatedDoctorPublicReviewList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DoctorPublicReview'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    PatchedFacilityDoctorRequest:
+      type: object
+      description: |-
+        Facility-scoped doctor management serializer.
+
+        Security & Domain Invariants:
+        1. Facility assignment is strictly derived from the authenticated administrator.
+        2. Client-supplied hospitalId, clinicId, or facilityId are strictly rejected/ignored.
+        3. Reassignment across facilities is strictly forbidden.
+        4. XOR invariant (Hospital XOR Clinic) is enforced server-side.
+        5. Ratings, review counts, and status cannot be mass-assigned.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        name_ar:
+          type: string
+          maxLength: 255
+        photo:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        specialty:
+          type: string
+          minLength: 1
+          maxLength: 128
+        special_interests: {}
+        experience_years:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        experience_text:
+          type: string
+          maxLength: 64
+        experience_text_ar:
+          type: string
+          maxLength: 64
+        education:
+          type: string
+          maxLength: 255
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          nullable: true
+        location:
+          type: string
+          maxLength: 128
+        about:
+          type: string
+        about_ar:
+          type: string
+        available_days:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          default:
+          - Monday
+          - Tuesday
+          - Wednesday
+          - Thursday
+          - Saturday
+        standard_slots:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          default:
+          - 09:00 - 09:30
+          - 09:30 - 10:00
+          - 10:00 - 10:30
+          - 11:00 - 11:30
+          - 14:00 - 14:30
+          - 15:00 - 15:30
+        slot_duration_minutes:
+          type: integer
+          default: 30
+    PatchedPatientDependentRequest:
+      type: object
+      description: Serializer for patient dependent profiles.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        relation:
+          $ref: '#/components/schemas/RelationEnum'
+        gender:
+          type: string
+          maxLength: 16
+        dob:
+          type: string
+          format: date
+          nullable: true
+        blood_group:
+          oneOf:
+          - $ref: '#/components/schemas/BloodGroupEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        allergies:
+          type: string
+        medical_notes:
+          type: string
+        emergency_contact:
+          type: string
+          maxLength: 64
+        insurance_provider:
+          type: string
+          maxLength: 128
+        insurance_number:
+          type: string
+          maxLength: 64
+    PatientDependent:
+      type: object
+      description: Serializer for patient dependent profiles.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        relation:
+          $ref: '#/components/schemas/RelationEnum'
+        gender:
+          type: string
+          maxLength: 16
+        dob:
+          type: string
+          format: date
+          nullable: true
+        blood_group:
+          oneOf:
+          - $ref: '#/components/schemas/BloodGroupEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        allergies:
+          type: string
+        medical_notes:
+          type: string
+        emergency_contact:
+          type: string
+          maxLength: 64
+        insurance_provider:
+          type: string
+          maxLength: 128
+        insurance_number:
+          type: string
+          maxLength: 64
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - relation
+      - updated_at
+    PatientDependentRequest:
+      type: object
+      description: Serializer for patient dependent profiles.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        relation:
+          $ref: '#/components/schemas/RelationEnum'
+        gender:
+          type: string
+          maxLength: 16
+        dob:
+          type: string
+          format: date
+          nullable: true
+        blood_group:
+          oneOf:
+          - $ref: '#/components/schemas/BloodGroupEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        allergies:
+          type: string
+        medical_notes:
+          type: string
+        emergency_contact:
+          type: string
+          maxLength: 64
+        insurance_provider:
+          type: string
+          maxLength: 128
+        insurance_number:
+          type: string
+          maxLength: 64
+      required:
+      - name
+      - relation
+    ProviderRequestPublicCreate:
+      type: object
+      description: |-
+        Public submission serializer for hospital and clinic partnership requests.
+
+        Security & Domain Invariants:
+        - Only 'hospital' and 'clinic' provider types are permitted.
+        - Individual doctor registration through this flow is strictly rejected.
+        - Status is strictly enforced to 'pending' by the server.
+        - All administrative review fields are read-only.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        provider_type:
+          $ref: '#/components/schemas/ProviderTypeEnum'
+        name:
+          type: string
+          maxLength: 255
+          minLength: 2
+        name_ar:
+          type: string
+          default: ''
+          maxLength: 255
+        contact_person:
+          type: string
+          maxLength: 255
+          minLength: 2
+        contact_number:
+          type: string
+          maxLength: 32
+          minLength: 6
+        email:
+          type: string
+          format: email
+        country:
+          type: string
+          default: United Arab Emirates
+          maxLength: 64
+        location:
+          type: string
+          maxLength: 128
+          minLength: 2
+        address:
+          type: string
+          default: ''
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEf1Enum'
+          readOnly: true
+        admin_notes:
+          type: string
+          default: ''
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - contact_number
+      - contact_person
+      - email
+      - id
+      - location
+      - name
+      - provider_type
+      - status
+      - submitted_at
+    ProviderRequestPublicCreateRequest:
+      type: object
+      description: |-
+        Public submission serializer for hospital and clinic partnership requests.
+
+        Security & Domain Invariants:
+        - Only 'hospital' and 'clinic' provider types are permitted.
+        - Individual doctor registration through this flow is strictly rejected.
+        - Status is strictly enforced to 'pending' by the server.
+        - All administrative review fields are read-only.
+      properties:
+        provider_type:
+          $ref: '#/components/schemas/ProviderTypeEnum'
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        name_ar:
+          type: string
+          default: ''
+          maxLength: 255
+        contact_person:
+          type: string
+          minLength: 2
+          maxLength: 255
+        contact_number:
+          type: string
+          minLength: 6
+          maxLength: 32
+        email:
+          type: string
+          format: email
+          minLength: 1
+        country:
+          type: string
+          minLength: 1
+          default: United Arab Emirates
+          maxLength: 64
+        location:
+          type: string
+          minLength: 2
+          maxLength: 128
+        address:
+          type: string
+          default: ''
+        admin_notes:
+          type: string
+          default: ''
+      required:
+      - contact_number
+      - contact_person
+      - email
+      - location
+      - name
+      - provider_type
+    ProviderRequestPublicStatus:
+      type: object
+      description: |-
+        Public, privacy-preserving serializer for querying application status by reference ID.
+
+        Privacy Invariants:
+        - Exposes strictly non-sensitive status and timestamp information.
+        - Sensitive fields (applicant email, phone, contact person, address, license,
+          admin notes, review actor, and internal facility details) are strictly excluded.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        provider_type:
+          allOf:
+          - $ref: '#/components/schemas/ProviderTypeEnum'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEf1Enum'
+          readOnly: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - id
+      - provider_type
+      - status
+      - submitted_at
+    ProviderTypeEnum:
+      enum:
+      - hospital
+      - clinic
+      type: string
+      description: |-
+        * `hospital` - Hospital
+        * `clinic` - Clinic
+    RelationEnum:
+      enum:
+      - Spouse
+      - Child
+      - Parent
+      - Sibling
+      - Other
+      type: string
+      description: |-
+        * `Spouse` - Spouse
+        * `Child` - Child
+        * `Parent` - Parent
+        * `Sibling` - Sibling
+        * `Other` - Other
+    Status57cEnum:
+      enum:
+      - Active
+      - Deactivated
+      type: string
+      description: |-
+        * `Active` - Active
+        * `Deactivated` - Deactivated
+    StatusEf1Enum:
+      enum:
+      - pending
+      - approved
+      - rejected
+      type: string
+      description: |-
+        * `pending` - Pending Review
+        * `approved` - Approved
+        * `rejected` - Rejected
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter JWT Bearer token obtained from /api/v1/auth/token/
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
