@@ -1,0 +1,2 @@
+# MeetAdr Backend Dependencies
+-r requirements/base.txt
