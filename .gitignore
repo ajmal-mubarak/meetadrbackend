@@ -21,10 +21,17 @@ staticfiles/
 # Environment variables
 .env
 .env.*
-!.env.example
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# Handover / documentation files (local only)
+setup.md
+databasedetails.md
+databaseschema.md
+features_APIs.md
+issues.md
+local_instructions.md
