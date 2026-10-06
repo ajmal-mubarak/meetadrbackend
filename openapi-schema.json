@@ -20,7 +20,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - hospital-admin
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -47,7 +47,7 @@ paths:
         schema:
           type: integer
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -72,7 +72,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -90,7 +90,7 @@ paths:
         Platform-admin only. Never exposes individual patient PHI, clinical notes,
         diagnoses, or prescriptions. All metrics are aggregated.
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -117,7 +117,7 @@ paths:
         schema:
           type: integer
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -142,7 +142,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -156,7 +156,7 @@ paths:
         Platform administrator listing of all registered Hospitals and Clinics.
         GET /api/v1/admin/providers/
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -177,7 +177,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -195,7 +195,7 @@ paths:
         Platform-admin only. Never exposes individual patient PHI, clinical notes,
         diagnoses, or prescriptions. All metrics are aggregated.
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -209,7 +209,7 @@ paths:
         Platform administrator listing of provider onboarding requests with faceted filtering.
         GET /api/v1/admin/requests/
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -236,7 +236,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -270,7 +270,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -306,7 +306,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -320,7 +320,7 @@ paths:
         Authenticated patient consultation booking endpoint.
         Atomic concurrency-safe slot allocation preventing double-booking.
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -339,7 +339,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -360,7 +360,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -379,7 +379,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -398,7 +398,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -420,7 +420,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -441,7 +441,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -463,7 +463,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -485,7 +485,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -506,7 +506,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -518,7 +518,7 @@ paths:
       operationId: v1_appointments_my_list
       description: List appointments booked by the authenticated patient.
       tags:
-      - v1
+      - Bookings
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -537,21 +537,37 @@ paths:
       description: Authenticates credentials, generates JWT tokens and sets HttpOnly
         cookie.
       tags:
-      - v1
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
       security:
       - jwtAuth: []
       - BearerAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+          description: ''
   /api/v1/auth/logout/:
     post:
       operationId: v1_auth_logout_create
       description: Revokes refresh token, adds jti to blacklist, and clears HttpOnly
         cookie.
       tags:
-      - v1
+      - Authentication
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -564,7 +580,7 @@ paths:
       operationId: v1_auth_me_retrieve
       description: Retrieves or updates authenticated user profile (/api/v1/auth/me/).
       tags:
-      - v1
+      - Authentication
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -575,7 +591,7 @@ paths:
       operationId: v1_auth_me_partial_update
       description: Retrieves or updates authenticated user profile (/api/v1/auth/me/).
       tags:
-      - v1
+      - Authentication
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -589,7 +605,7 @@ paths:
         Public password establishment endpoint for newly approved facility administrators.
         POST /api/v1/auth/provider-setup/complete/
       tags:
-      - v1
+      - Authentication
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -604,7 +620,7 @@ paths:
         Public validation endpoint for single-use provider administrator invitation tokens.
         POST /api/v1/auth/provider-setup/validate/
       tags:
-      - v1
+      - Authentication
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -617,28 +633,59 @@ paths:
       operationId: v1_auth_register_create
       description: Public patient registration endpoint.
       tags:
-      - v1
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientRegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatientRegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatientRegisterRequest'
+        required: true
       security:
       - jwtAuth: []
       - BearerAuth: []
       - {}
       responses:
-        '200':
-          description: No response body
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+          description: ''
   /api/v1/auth/token/refresh/:
     post:
       operationId: v1_auth_token_refresh_create
       description: Exchanges valid refresh token for rotated refresh token and new
         access token.
       tags:
-      - v1
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenRefreshRequest'
       security:
       - jwtAuth: []
       - BearerAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomTokenRefresh'
+          description: ''
   /api/v1/clinics/:
     get:
       operationId: v1_clinics_list
@@ -646,7 +693,7 @@ paths:
         Public directory of specialized outpatient clinics with faceted filtering.
         Filters: location, specialty, search keyword.
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -672,7 +719,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -690,7 +737,7 @@ paths:
       description: Public A-Z Health Conditions directory with symptoms and specialty
         mappings.
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -709,7 +756,7 @@ paths:
           type: string
         required: true
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -737,7 +784,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -767,7 +814,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       requestBody:
         content:
           application/json:
@@ -809,7 +856,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       requestBody:
         content:
           application/json:
@@ -850,7 +897,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -874,7 +921,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -887,7 +934,7 @@ paths:
       description: List appointments for the authenticated doctor with status, date,
         and search filters.
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -912,7 +959,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -931,7 +978,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -945,7 +992,7 @@ paths:
         Unified doctor clinical KPI metrics, weekly workload trend, and upcoming appointments.
         Strictly scoped to consultations of the authenticated doctor.
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -959,7 +1006,7 @@ paths:
         Roster of unique patients who have booked or completed consultations with the authenticated doctor.
         Enforces strict doctor isolation and clinical privacy boundaries.
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -981,7 +1028,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -996,7 +1043,7 @@ paths:
         GET auto-provisions default schedule if none exists yet.
         PUT/PATCH updates practicing days, slots, and slot duration.
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1010,7 +1057,7 @@ paths:
         GET auto-provisions default schedule if none exists yet.
         PUT/PATCH updates practicing days, slots, and slot duration.
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1024,7 +1071,7 @@ paths:
         GET auto-provisions default schedule if none exists yet.
         PUT/PATCH updates practicing days, slots, and slot duration.
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1038,7 +1085,7 @@ paths:
         Public directory of accredited doctors with multi-parameter faceted filtering.
         Filters: specialty, location, hospital, clinic, practicing day, rating, search keyword.
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1065,7 +1112,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1093,7 +1140,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1128,7 +1175,7 @@ paths:
         schema:
           type: integer
       tags:
-      - v1
+      - Doctor
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1147,7 +1194,7 @@ paths:
         Operational dashboard KPIs for the authenticated facility administrator.
         GET /api/v1/facility/dashboard/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1162,7 +1209,7 @@ paths:
         GET /api/v1/hospital/departments/
         POST /api/v1/hospital/departments/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1176,7 +1223,7 @@ paths:
         GET /api/v1/hospital/departments/
         POST /api/v1/hospital/departments/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1199,7 +1246,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1221,7 +1268,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1243,7 +1290,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1263,7 +1310,7 @@ paths:
         - Creating a doctor derives the facility server-side from request.user.
         - Client-supplied facility IDs in POST body are strictly stripped/ignored.
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1288,7 +1335,7 @@ paths:
         - Creating a doctor derives the facility server-side from request.user.
         - Client-supplied facility IDs in POST body are strictly stripped/ignored.
       tags:
-      - v1
+      - Hospital Admin
       requestBody:
         content:
           application/json:
@@ -1331,7 +1378,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1361,7 +1408,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       requestBody:
         content:
           application/json:
@@ -1403,7 +1450,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       requestBody:
         content:
           application/json:
@@ -1444,7 +1491,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1468,7 +1515,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1483,7 +1530,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1497,7 +1544,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1511,7 +1558,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1526,7 +1573,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1540,7 +1587,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1554,7 +1601,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1572,7 +1619,7 @@ paths:
         Never exposes database credentials, hostnames, environment variables,
         or internal stack traces on failure.
       tags:
-      - v1
+      - Notifications & System
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1586,7 +1633,7 @@ paths:
       description: List appointments for doctors belonging to the authenticated hospital
         or clinic.
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1613,7 +1660,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1634,7 +1681,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1648,7 +1695,7 @@ paths:
         Operational dashboard KPIs for the authenticated facility administrator.
         GET /api/v1/facility/dashboard/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1663,7 +1710,7 @@ paths:
         GET /api/v1/hospital/departments/
         POST /api/v1/hospital/departments/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1677,7 +1724,7 @@ paths:
         GET /api/v1/hospital/departments/
         POST /api/v1/hospital/departments/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1700,7 +1747,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1722,7 +1769,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1744,7 +1791,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1764,7 +1811,7 @@ paths:
         - Creating a doctor derives the facility server-side from request.user.
         - Client-supplied facility IDs in POST body are strictly stripped/ignored.
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1789,7 +1836,7 @@ paths:
         - Creating a doctor derives the facility server-side from request.user.
         - Client-supplied facility IDs in POST body are strictly stripped/ignored.
       tags:
-      - v1
+      - Hospital Admin
       requestBody:
         content:
           application/json:
@@ -1832,7 +1879,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1862,7 +1909,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       requestBody:
         content:
           application/json:
@@ -1904,7 +1951,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       requestBody:
         content:
           application/json:
@@ -1945,7 +1992,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1969,7 +2016,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1984,7 +2031,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -1998,7 +2045,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2012,7 +2059,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2027,7 +2074,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2041,7 +2088,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2055,7 +2102,7 @@ paths:
         GET /api/v1/facility/settings/
         PATCH /api/v1/facility/settings/
       tags:
-      - v1
+      - Hospital Admin
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2069,7 +2116,7 @@ paths:
         Public directory of accredited medical hospitals with faceted filtering.
         Filters: location, emergency_available, specialty, search keyword.
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2096,7 +2143,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2129,7 +2176,7 @@ paths:
         schema:
           type: integer
       tags:
-      - v1
+      - Notifications & System
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2152,7 +2199,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Notifications & System
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2174,7 +2221,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Notifications & System
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2186,7 +2233,7 @@ paths:
       operationId: v1_notifications_clear_all_destroy
       description: Clears all notifications for the authenticated user.
       tags:
-      - v1
+      - Notifications & System
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2200,7 +2247,7 @@ paths:
         Bulk marks all unread notifications as read for the authenticated user.
         Executes an atomic database UPDATE without affecting other users.
       tags:
-      - v1
+      - Notifications & System
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2214,7 +2261,7 @@ paths:
         Returns the real-time unread notification count for the authenticated user.
         Executes a single direct SQL COUNT query without instantiating model rows.
       tags:
-      - v1
+      - Notifications & System
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2226,7 +2273,7 @@ paths:
       operationId: v1_patient_appointments_list
       description: List appointments booked by the authenticated patient.
       tags:
-      - v1
+      - Patient
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2246,7 +2293,7 @@ paths:
         CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
         Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
       tags:
-      - v1
+      - Patient
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2265,7 +2312,7 @@ paths:
         CRUD ViewSet for managing dependents belonging strictly to the authenticated patient.
         Enforces strict IDOR protection by scoping querysets exclusively to request.user.patient_profile.
       tags:
-      - v1
+      - Patient
       requestBody:
         content:
           application/json:
@@ -2302,7 +2349,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Patient
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2326,7 +2373,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Patient
       requestBody:
         content:
           application/json:
@@ -2362,7 +2409,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Patient
       requestBody:
         content:
           application/json:
@@ -2397,7 +2444,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Patient
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2409,7 +2456,7 @@ paths:
       operationId: v1_patient_profile_retrieve
       description: Direct access to authenticated patient's clinical profile.
       tags:
-      - v1
+      - Patient
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2420,7 +2467,7 @@ paths:
       operationId: v1_patient_profile_update
       description: Direct access to authenticated patient's clinical profile.
       tags:
-      - v1
+      - Patient
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2431,7 +2478,7 @@ paths:
       operationId: v1_patient_profile_partial_update
       description: Direct access to authenticated patient's clinical profile.
       tags:
-      - v1
+      - Patient
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2455,7 +2502,7 @@ paths:
         - Concurrency-safe: database partial UniqueConstraint enforces 1 active Rx per appointment.
         - Zero clinical PHI in audit logs.
       tags:
-      - v1
+      - Prescriptions
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2483,7 +2530,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Prescriptions
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2512,7 +2559,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Prescriptions
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2540,7 +2587,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Prescriptions
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2558,7 +2605,7 @@ paths:
         - Doctors see prescriptions they have issued.
         - Other roles receive 403 Forbidden (preventing clinical PHI exposure).
       tags:
-      - v1
+      - Prescriptions
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2572,7 +2619,7 @@ paths:
         Public submission endpoint for hospital and clinic partnership onboarding requests.
         POST /api/v1/provider-requests/
       tags:
-      - v1
+      - Discovery & Facilities
       requestBody:
         content:
           application/json:
@@ -2614,7 +2661,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2632,7 +2679,7 @@ paths:
       description: Returns list of distinct active medical specialties available across
         the platform.
       tags:
-      - v1
+      - Discovery & Facilities
       security:
       - jwtAuth: []
       - BearerAuth: []
@@ -2672,8 +2719,6 @@ components:
         special_interests: {}
         experience_years:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         experience_text:
           type: string
           maxLength: 64
@@ -2686,8 +2731,6 @@ components:
           pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
         review_count:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         location:
           type: string
           maxLength: 128
@@ -3227,6 +3270,20 @@ components:
       - phone
       - primary_specialty
       - total_reviews
+    CustomTokenRefresh:
+      type: object
+      description: Token refresh serializer enforcing rotation and 30-day session
+        lifetime ceiling.
+      properties:
+        refresh:
+          type: string
+    CustomTokenRefreshRequest:
+      type: object
+      description: Token refresh serializer enforcing rotation and 30-day session
+        lifetime ceiling.
+      properties:
+        refresh:
+          type: string
     DoctorDetail:
       type: object
       description: Detailed doctor profile with full facility context and schedule.
@@ -3254,8 +3311,6 @@ components:
         special_interests: {}
         experience_years:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         experience_text:
           type: string
           maxLength: 64
@@ -3268,8 +3323,6 @@ components:
           pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
         review_count:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         location:
           type: string
           maxLength: 128
@@ -3357,8 +3410,6 @@ components:
         special_interests: {}
         experience_years:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         experience_text:
           type: string
           maxLength: 64
@@ -3371,8 +3422,6 @@ components:
           pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
         review_count:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         location:
           type: string
           maxLength: 128
@@ -3476,8 +3525,6 @@ components:
           readOnly: true
         slot_duration_minutes:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         slotDurationMinutes:
           type: integer
           readOnly: true
@@ -3501,8 +3548,6 @@ components:
           maxLength: 255
         bed_capacity:
           type: integer
-          maximum: 2147483647
-          minimum: 0
       required:
       - id
       - name
@@ -3541,8 +3586,6 @@ components:
         special_interests: {}
         experience_years:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         experience_text:
           type: string
           maxLength: 64
@@ -3662,8 +3705,6 @@ components:
         special_interests: {}
         experience_years:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         experience_text:
           type: string
           maxLength: 64
@@ -3863,6 +3904,21 @@ components:
       - phone
       - specialties
       - total_reviews
+    LoginRequest:
+      type: object
+      description: Credentials authentication serializer.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
     Notification:
       type: object
       description: Serializer mapping Notification model to frontend PatientNotification
@@ -4036,8 +4092,6 @@ components:
         special_interests: {}
         experience_years:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         experience_text:
           type: string
           maxLength: 64
@@ -4207,6 +4261,33 @@ components:
       required:
       - name
       - relation
+    PatientRegisterRequest:
+      type: object
+      description: |-
+        Public patient registration serializer.
+        Strictly hardcodes role='patient', is_staff=False, is_superuser=False.
+        Any submitted privileged keys are discarded.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        phone:
+          type: string
+          default: ''
+          maxLength: 32
+      required:
+      - email
+      - name
+      - password
     ProviderRequestPublicCreate:
       type: object
       description: |-
@@ -4383,6 +4464,18 @@ components:
         * `Parent` - Parent
         * `Sibling` - Sibling
         * `Other` - Other
+    RoleEnum:
+      enum:
+      - patient
+      - doctor
+      - hospital
+      - admin
+      type: string
+      description: |-
+        * `patient` - Patient
+        * `doctor` - Doctor
+        * `hospital` - Hospital/Clinic Administrator
+        * `admin` - Platform Superadministrator
     Status57cEnum:
       enum:
       - Active
@@ -4401,13 +4494,90 @@ components:
         * `pending` - Pending Review
         * `approved` - Approved
         * `rejected` - Rejected
+    UserSummary:
+      type: object
+      description: Safe, minimal summary of authenticated user profile.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 32
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        avatar:
+          nullable: true
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
+        doctor_id:
+          type: string
+          readOnly: true
+        facility_id:
+          type: string
+          readOnly: true
+        facility_type:
+          type: string
+          readOnly: true
+        facility_name:
+          type: string
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - date_joined
+      - doctor_id
+      - email
+      - facility_id
+      - facility_name
+      - facility_type
+      - id
+      - name
+      - role
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Enter JWT Bearer token obtained from /api/v1/auth/token/
+      description: Enter JWT Bearer token obtained from /api/v1/auth/login/
     jwtAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+tags:
+- name: Authentication
+  description: Login, registration, JWT tokens, and account setup
+- name: Bookings
+  description: Appointment scheduling, cancellation, rescheduling, and reviews
+- name: Patient
+  description: Patient profile, dependents, and medical history
+- name: Doctor
+  description: Doctor directory, weekly schedule slots, and consultation management
+- name: Hospital Admin
+  description: Hospital and clinic administration, staff, departments, and facility
+    appointments
+- name: Admin
+  description: Platform admin controls, provider onboarding approvals, and system
+    reports
+- name: Prescriptions
+  description: Digital prescription issuance and medication management
+- name: Discovery & Facilities
+  description: Public search for hospitals, clinics, medical specialties, and conditions
+- name: Notifications & System
+  description: User notifications and API health check

@@ -59,11 +59,19 @@ def clear_auth_refresh_cookie(response):
     samesite = getattr(settings, 'AUTH_COOKIE_SAMESITE', 'Lax')
     response.delete_cookie(cookie_name, path=cookie_path, samesite=samesite)
 
+from drf_spectacular.utils import extend_schema
+
 class LoginView(views.APIView):
     """Authenticates credentials, generates JWT tokens and sets HttpOnly cookie."""
     permission_classes = [AllowAny]
     throttle_scope = 'auth'
+    serializer_class = LoginSerializer
 
+    @extend_schema(
+        request=LoginSerializer,
+        responses={200: UserSummarySerializer},
+        description="Authenticates credentials, generates JWT tokens and sets HttpOnly cookie."
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -93,7 +101,13 @@ class RegisterView(views.APIView):
     """Public patient registration endpoint."""
     permission_classes = [AllowAny]
     throttle_scope = 'auth'
+    serializer_class = PatientRegisterSerializer
 
+    @extend_schema(
+        request=PatientRegisterSerializer,
+        responses={201: UserSummarySerializer},
+        description="Public patient registration endpoint."
+    )
     def post(self, request):
         serializer = PatientRegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -122,7 +136,12 @@ class RegisterView(views.APIView):
 class RefreshTokenView(views.APIView):
     """Exchanges valid refresh token for rotated refresh token and new access token."""
     permission_classes = [AllowAny]
+    serializer_class = CustomTokenRefreshSerializer
 
+    @extend_schema(
+        request=CustomTokenRefreshSerializer,
+        description="Exchanges valid refresh token for rotated refresh token and new access token."
+    )
     def post(self, request):
         serializer = CustomTokenRefreshSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)

@@ -154,6 +154,21 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
+    'TAGS': [
+        {'name': 'Authentication', 'description': 'Login, registration, JWT tokens, and account setup'},
+        {'name': 'Bookings', 'description': 'Appointment scheduling, cancellation, rescheduling, and reviews'},
+        {'name': 'Patient', 'description': 'Patient profile, dependents, and medical history'},
+        {'name': 'Doctor', 'description': 'Doctor directory, weekly schedule slots, and consultation management'},
+        {'name': 'Hospital Admin', 'description': 'Hospital and clinic administration, staff, departments, and facility appointments'},
+        {'name': 'Admin', 'description': 'Platform admin controls, provider onboarding approvals, and system reports'},
+        {'name': 'Prescriptions', 'description': 'Digital prescription issuance and medication management'},
+        {'name': 'Discovery & Facilities', 'description': 'Public search for hospitals, clinics, medical specialties, and conditions'},
+        {'name': 'Notifications & System', 'description': 'User notifications and API health check'},
+    ],
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+        'config.openapi_hooks.categorize_swagger_tags',
+    ],
     'SECURITY': [
         {
             'BearerAuth': []
@@ -165,7 +180,7 @@ SPECTACULAR_SETTINGS = {
                 'type': 'http',
                 'scheme': 'bearer',
                 'bearerFormat': 'JWT',
-                'description': 'Enter JWT Bearer token obtained from /api/v1/auth/token/',
+                'description': 'Enter JWT Bearer token obtained from /api/v1/auth/login/',
             }
         }
     },
