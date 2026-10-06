@@ -482,7 +482,7 @@ with transaction.atomic():
 
     print("\n=== 6. Verified Patient Reviews & Rating Calculation ===")
     from datetime import date, timedelta
-    from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview
+    from apps.appointments.models import Appointment, AppointmentStatus, DoctorReview, FacilityReview
     from apps.appointments.services import recalculate_doctor_rating
 
     patient_user = User.objects.filter(role=UserRole.PATIENT).first()
@@ -512,7 +512,26 @@ with transaction.atomic():
             (5, 'Wonderful pediatrician. She was very gentle and caring with my daughter.'),
             (5, 'Extremely knowledgeable and puts both kids and parents at complete ease.')
         ]),
+        ('Dr. Ahmed Nassif', [
+            (5, 'Extremely knowledgeable dermatologist. Prescribed the exact treatment regimen I needed.'),
+        ]),
     ]
+
+    # Distinct hospital & clinic reviews: Patients rate the medical facility (cleanliness, facilities, service)
+    # separately from their doctor rating.
+    facility_reviews_map = {
+        'American Hospital Dubai': [
+            (5, 'State-of-the-art cardiology wing, spotless corridors, and very smooth reception check-in.'),
+            (4, 'Great facilities and clean premises, courteous nursing staff, and easy parking.')
+        ],
+        'Aster Hospital Mankhool': [
+            (5, 'Very clean multi-specialty facility, minimal waiting time, and well-managed patient registration.')
+        ],
+        'Emirates Skin & Dermatology Clinic': [
+            (5, 'Advanced aesthetic treatment rooms, sterile environment, and polite clinic reception.')
+        ]
+    }
+    facility_review_counters = {k: 0 for k in facility_reviews_map}
 
     today = date.today()
     for doc_name, revs in reviews_data:
@@ -547,12 +566,45 @@ with transaction.atomic():
                     comment=comm
                 )
             )
+
+            # Check if this completed visit generates a separate FacilityReview for the hospital or clinic
+            fac_name = doc.hospital.name if doc.hospital else (doc.clinic.name if doc.clinic else None)
+            if fac_name and fac_name in facility_reviews_map:
+                f_list = facility_reviews_map[fac_name]
+                f_idx = facility_review_counters[fac_name]
+                if f_idx < len(f_list):
+                    f_star, f_comment = f_list[f_idx]
+                    FacilityReview.objects.get_or_create(
+                        appointment=appt,
+                        defaults=dict(
+                            hospital=doc.hospital,
+                            clinic=doc.clinic,
+                            patient=patient_user,
+                            rating=f_star,
+                            comment=f_comment
+                        )
+                    )
+                    facility_review_counters[fac_name] += 1
+
         recalculate_doctor_rating(doc.id)
         doc.refresh_from_db()
         print(f"  + Review synced for {doc.name}: {doc.rating} stars ({doc.review_count} reviews)")
 
     for d in Doctor.objects.exclude(name__in=[r[0] for r in reviews_data]):
         recalculate_doctor_rating(d.id)
+
+    print("\n=== Facility Reviews Summary ===")
+    from django.db.models import Avg, Count
+    for h in Hospital.objects.all():
+        agg = h.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
+        cnt = agg['count'] or 0
+        avg = round(float(agg['avg']), 1) if agg['avg'] is not None else None
+        print(f"  * Hospital '{h.name}': {avg} stars ({cnt} facility reviews) [Doctor ratings NOT mixed]")
+    for c in Clinic.objects.all():
+        agg = c.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
+        cnt = agg['count'] or 0
+        avg = round(float(agg['avg']), 1) if agg['avg'] is not None else None
+        print(f"  * Clinic '{c.name}': {avg} stars ({cnt} facility reviews) [Doctor ratings NOT mixed]")
 
     print("\n=== DONE ===")
     print("Database seeded successfully!")

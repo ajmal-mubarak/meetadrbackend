@@ -265,9 +265,6 @@ class AdminProviderListView(views.APIView):
                 rev_agg = h.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
                 avg_val = rev_agg.get('avg')
                 total_revs = rev_agg.get('count') or 0
-                if avg_val is None:
-                    doc_agg = h.doctors.filter(rating__gt=0).aggregate(avg=Avg('rating'))
-                    avg_val = doc_agg.get('avg')
                 doc_count = h.doctors.count()
 
                 results.append({
@@ -299,9 +296,6 @@ class AdminProviderListView(views.APIView):
                 rev_agg = c.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
                 avg_val = rev_agg.get('avg')
                 total_revs = rev_agg.get('count') or 0
-                if avg_val is None:
-                    doc_agg = c.doctors.filter(rating__gt=0).aggregate(avg=Avg('rating'))
-                    avg_val = doc_agg.get('avg')
                 doc_count = c.doctors.count()
 
                 results.append({
