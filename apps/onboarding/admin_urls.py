@@ -8,7 +8,8 @@ from apps.onboarding.views import (
 )
 from apps.facilities.facility_views import (
     AdminProviderListView,
-    AdminProviderStatusView
+    AdminProviderStatusView,
+    AdminProviderDetailView,
 )
 from apps.doctors.admin_views import (
     AdminDoctorListView,
@@ -31,6 +32,7 @@ urlpatterns = [
 
     # Provider facilities global oversight: /api/v1/admin/providers/
     path('providers/', AdminProviderListView.as_view(), name='admin_provider_list'),
+    path('providers/<uuid:pk>/', AdminProviderDetailView.as_view(), name='admin_provider_detail'),
     path('providers/<uuid:pk>/status/', AdminProviderStatusView.as_view(), name='admin_provider_status'),
 
     # Platform-wide doctor management: /api/v1/admin/doctors/

@@ -1,4 +1,5 @@
 """Views for facility-scoped administrative management and platform-wide provider oversight."""
+from django.db import transaction
 from django.db.models import Q, Count, Avg
 from rest_framework import views, status, generics
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from apps.facilities.facility_serializers import (
     FacilitySettingsSerializer,
     FacilityDepartmentManageSerializer,
     AdminFacilityStatusUpdateSerializer,
+    AdminProviderCreateSerializer,
 )
 from apps.audit.utils import log_audit_event
 
@@ -317,6 +319,122 @@ class AdminProviderListView(views.APIView):
 
         results.sort(key=lambda x: str(x['name']))
         return Response(results, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = AdminProviderCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        p_type = data.get('type', 'hospital')
+        name = data['name']
+        name_ar = data.get('name_ar') or ''
+        photo = data.get('photo') or ''
+        location = data.get('location') or 'Dubai'
+        address = data.get('address') or f"{location}, UAE"
+        address_ar = data.get('address_ar') or ''
+        phone = data.get('phone') or '+971 4 000 0000'
+        operating_hours = data.get('operating_hours') or 'Open 24/7'
+        operating_hours_ar = data.get('operating_hours_ar') or ''
+        about = data.get('about') or f"{name} is an accredited medical healthcare provider."
+        about_ar = data.get('about_ar') or ''
+
+        if p_type == 'hospital':
+            facility = Hospital.objects.create(
+                name=name,
+                name_ar=name_ar,
+                photo=photo,
+                location=location,
+                address=address,
+                address_ar=address_ar,
+                phone=phone,
+                operating_hours=operating_hours,
+                operating_hours_ar=operating_hours_ar,
+                about=about,
+                about_ar=about_ar,
+                emergency_available=data.get('emergency_available', True),
+                insurance_plans=data.get('insurance_plans', ''),
+                status=FacilityStatus.ACTIVE
+            )
+        else:
+            facility = Clinic.objects.create(
+                name=name,
+                name_ar=name_ar,
+                photo=photo,
+                location=location,
+                address=address,
+                address_ar=address_ar,
+                phone=phone,
+                operating_hours=operating_hours,
+                operating_hours_ar=operating_hours_ar,
+                about=about,
+                about_ar=about_ar,
+                primary_specialty=data.get('primary_specialty') or 'General Medicine',
+                status=FacilityStatus.ACTIVE
+            )
+
+        log_audit_event(
+            action="FACILITY_CREATED",
+            target_model=facility.__class__.__name__,
+            target_id=str(facility.id),
+            actor=request.user,
+            change_summary={"name": facility.name, "type": p_type, "location": facility.location},
+            request=request
+        )
+
+        return Response({
+            'id': str(facility.id),
+            'type': p_type,
+            'name': facility.name,
+            'name_ar': facility.name_ar,
+            'photo': facility.photo or '',
+            'location': facility.location,
+            'address': facility.address,
+            'phone': facility.phone,
+            'status': facility.status,
+            'admin_email': None,
+            'created_at': facility.created_at,
+            'avg_rating': None,
+            'total_reviews': 0,
+            'total_doctors': 0,
+            'message': f"{p_type.capitalize()} '{facility.name}' created successfully."
+        }, status=status.HTTP_201_CREATED)
+
+class AdminProviderDetailView(views.APIView):
+    """
+    Platform administrator detail and deletion endpoint for Hospitals and Clinics.
+    DELETE /api/v1/admin/providers/{id}/
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def delete(self, request, pk):
+        facility = Hospital.objects.filter(id=pk).first() or Clinic.objects.filter(id=pk).first()
+        if not facility:
+            raise NotFound("Provider facility not found.")
+
+        fac_name = facility.name
+        fac_type = facility.__class__.__name__
+
+        with transaction.atomic():
+            # Disassociate doctors and appointments to satisfy PROTECT foreign key constraints
+            if hasattr(facility, 'doctors'):
+                facility.doctors.update(hospital=None) if isinstance(facility, Hospital) else facility.doctors.update(clinic=None)
+            if hasattr(facility, 'appointments'):
+                facility.appointments.update(hospital=None) if isinstance(facility, Hospital) else facility.appointments.update(clinic=None)
+            facility.delete()
+
+        log_audit_event(
+            action="FACILITY_DELETED",
+            target_model=fac_type,
+            target_id=str(pk),
+            actor=request.user,
+            change_summary={"name": fac_name},
+            request=request
+        )
+
+        return Response({
+            "id": str(pk),
+            "message": f"{fac_type} '{fac_name}' deleted successfully."
+        }, status=status.HTTP_200_OK)
 
 class AdminProviderStatusView(views.APIView):
     """

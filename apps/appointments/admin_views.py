@@ -51,6 +51,25 @@ class AdminBookingListView(generics.ListAPIView):
         if status_param and status_param.lower() != 'all':
             queryset = queryset.filter(status__iexact=status_param.strip())
 
+        hospital_id = self.request.query_params.get('hospital_id') or self.request.query_params.get('hospital')
+        if hospital_id:
+            queryset = queryset.filter(Q(hospital_id=hospital_id) | Q(doctor__hospital_id=hospital_id))
+
+        clinic_id = self.request.query_params.get('clinic_id') or self.request.query_params.get('clinic')
+        if clinic_id:
+            queryset = queryset.filter(Q(clinic_id=clinic_id) | Q(doctor__clinic_id=clinic_id))
+
+        facility_id = self.request.query_params.get('facility_id')
+        if facility_id:
+            queryset = queryset.filter(
+                Q(hospital_id=facility_id) | Q(doctor__hospital_id=facility_id) |
+                Q(clinic_id=facility_id) | Q(doctor__clinic_id=facility_id)
+            )
+
+        doctor_id = self.request.query_params.get('doctor_id') or self.request.query_params.get('doctor')
+        if doctor_id:
+            queryset = queryset.filter(doctor_id=doctor_id)
+
         search = self.request.query_params.get('search')
         if search:
             q = search.strip()

@@ -103,3 +103,22 @@ class AdminFacilityStatusUpdateSerializer(serializers.Serializer):
         choices=FacilityStatus.choices,
         required=True
     )
+
+class AdminProviderCreateSerializer(serializers.Serializer):
+    """Platform administrator creation payload for new Hospitals and Clinics."""
+    type = serializers.ChoiceField(choices=['hospital', 'clinic'], default='hospital')
+    name = serializers.CharField(max_length=255)
+    name_ar = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    photo = serializers.URLField(required=False, allow_blank=True)
+    location = serializers.CharField(max_length=128, default='Dubai')
+    address = serializers.CharField(required=False, allow_blank=True)
+    address_ar = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    operating_hours = serializers.CharField(max_length=128, default='Open 24/7')
+    operating_hours_ar = serializers.CharField(max_length=128, required=False, allow_blank=True)
+    about = serializers.CharField(required=False, allow_blank=True)
+    about_ar = serializers.CharField(required=False, allow_blank=True)
+    emergency_available = serializers.BooleanField(default=True)
+    insurance_plans = serializers.CharField(required=False, allow_blank=True)
+    primary_specialty = serializers.CharField(max_length=128, required=False, allow_blank=True)
+
