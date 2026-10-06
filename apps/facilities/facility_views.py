@@ -1,5 +1,5 @@
 """Views for facility-scoped administrative management and platform-wide provider oversight."""
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Avg
 from rest_framework import views, status, generics
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -262,16 +262,29 @@ class AdminProviderListView(views.APIView):
                 hosp_qs = hosp_qs.filter(Q(name__icontains=q) | Q(location__icontains=q))
 
             for h in hosp_qs:
+                rev_agg = h.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
+                avg_val = rev_agg.get('avg')
+                total_revs = rev_agg.get('count') or 0
+                if avg_val is None:
+                    doc_agg = h.doctors.filter(rating__gt=0).aggregate(avg=Avg('rating'))
+                    avg_val = doc_agg.get('avg')
+                doc_count = h.doctors.count()
+
                 results.append({
                     'id': str(h.id),
                     'type': 'hospital',
                     'name': h.name,
                     'name_ar': h.name_ar,
+                    'photo': h.photo or '',
                     'location': h.location,
+                    'address': h.address,
                     'phone': h.phone,
                     'status': h.status,
                     'admin_email': h.admin_user.email if h.admin_user else None,
                     'created_at': h.created_at,
+                    'avg_rating': round(float(avg_val), 1) if avg_val is not None else None,
+                    'total_reviews': total_revs,
+                    'total_doctors': doc_count,
                 })
 
         if not provider_type or provider_type.lower() in ['all', 'clinic']:
@@ -283,16 +296,29 @@ class AdminProviderListView(views.APIView):
                 clinic_qs = clinic_qs.filter(Q(name__icontains=q) | Q(location__icontains=q))
 
             for c in clinic_qs:
+                rev_agg = c.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
+                avg_val = rev_agg.get('avg')
+                total_revs = rev_agg.get('count') or 0
+                if avg_val is None:
+                    doc_agg = c.doctors.filter(rating__gt=0).aggregate(avg=Avg('rating'))
+                    avg_val = doc_agg.get('avg')
+                doc_count = c.doctors.count()
+
                 results.append({
                     'id': str(c.id),
                     'type': 'clinic',
                     'name': c.name,
                     'name_ar': c.name_ar,
+                    'photo': c.photo or '',
                     'location': c.location,
+                    'address': c.address,
                     'phone': c.phone,
                     'status': c.status,
                     'admin_email': c.admin_user.email if c.admin_user else None,
                     'created_at': c.created_at,
+                    'avg_rating': round(float(avg_val), 1) if avg_val is not None else None,
+                    'total_reviews': total_revs,
+                    'total_doctors': doc_count,
                 })
 
         results.sort(key=lambda x: str(x['name']))

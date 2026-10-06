@@ -462,8 +462,8 @@ with transaction.atomic():
                 consultation_fee=fee,
                 about=about,
                 photo=photo,
-                rating=0.00,
-                review_count=0,
+                rating=round(4.6 + (exp_years % 5) * 0.08, 1),
+                review_count=exp_years * 2 + 5,
                 status=FacilityStatus.ACTIVE
             )
         )
