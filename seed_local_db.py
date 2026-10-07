@@ -447,26 +447,31 @@ with transaction.atomic():
     ]
 
     for (name, name_ar, specialty, hospital, clinic, user, location, exp_years, fee, about, photo, days, slots) in doctors_data:
-        doc, created = Doctor.objects.get_or_create(
-            name=name,
-            defaults=dict(
-                name_ar=name_ar,
-                specialty=specialty,
-                hospital=hospital,
-                clinic=clinic,
-                user=user,
-                location=location,
-                experience_years=exp_years,
-                experience_text=f'{exp_years}+ Years Experience',
-                experience_text_ar=f'{exp_years}+ سنة خبرة',
-                consultation_fee=fee,
-                about=about,
-                photo=photo,
-                rating=round(4.6 + (exp_years % 5) * 0.08, 1),
-                review_count=exp_years * 2 + 5,
-                status=FacilityStatus.ACTIVE
+        # Prevent OneToOne duplicate key violation if user already has a doctor profile
+        if user and Doctor.objects.filter(user=user).exists():
+            doc = Doctor.objects.filter(user=user).first()
+            created = False
+        else:
+            doc, created = Doctor.objects.get_or_create(
+                name=name,
+                defaults=dict(
+                    name_ar=name_ar,
+                    specialty=specialty,
+                    hospital=hospital,
+                    clinic=clinic,
+                    user=user,
+                    location=location,
+                    experience_years=exp_years,
+                    experience_text=f'{exp_years}+ Years Experience',
+                    experience_text_ar=f'{exp_years}+ سنة خبرة',
+                    consultation_fee=fee,
+                    about=about,
+                    photo=photo,
+                    rating=round(4.6 + (exp_years % 5) * 0.08, 1),
+                    review_count=exp_years * 2 + 5,
+                    status=FacilityStatus.ACTIVE
+                )
             )
-        )
         if created:
             DoctorSchedule.objects.get_or_create(
                 doctor=doc,
