@@ -224,6 +224,27 @@ CORS_ALLOWED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
+
+# Allow configured FRONTEND_URL if specified
+_frontend_url = os.getenv('FRONTEND_URL')
+if _frontend_url and _frontend_url.strip() and _frontend_url.strip() not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(_frontend_url.strip())
+
+# Support preview and production deployments on Vercel
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/.*\.vercel\.app$",
+]
+
+# CSRF Trusted Origins for HTTPS cross-origin requests
+CSRF_TRUSTED_ORIGINS = [
+    origin for origin in CORS_ALLOWED_ORIGINS if origin.startswith('http://') or origin.startswith('https://')
+]
+CSRF_TRUSTED_ORIGINS.extend([
+    'https://*.vercel.app',
+    'https://*.onrender.com',
+])
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
