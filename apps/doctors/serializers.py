@@ -286,3 +286,97 @@ class AdminDoctorStatusUpdateSerializer(serializers.Serializer):
     """
     status = serializers.ChoiceField(choices=FacilityStatus.choices)
 
+
+class AdminDoctorCreateSerializer(serializers.ModelSerializer):
+    """
+    Platform administrator serializer for creating new individual or facility-affiliated doctors.
+    Automatically initializes a complete DoctorSchedule.
+    """
+    nameAr = serializers.CharField(source='name_ar', required=False, allow_blank=True)
+    aboutAr = serializers.CharField(source='about_ar', required=False, allow_blank=True)
+    consultationFee = serializers.DecimalField(source='consultation_fee', max_digits=8, decimal_places=2, required=False, allow_null=True)
+    experienceYears = serializers.IntegerField(source='experience_years', required=False)
+    hospitalId = serializers.UUIDField(required=False, allow_null=True)
+    clinicId = serializers.UUIDField(required=False, allow_null=True)
+    availableDays = serializers.ListField(child=serializers.CharField(), required=False)
+    standardSlots = serializers.ListField(child=serializers.CharField(), required=False)
+
+    class Meta:
+        model = Doctor
+        fields = [
+            'id',
+            'name',
+            'name_ar',
+            'nameAr',
+            'photo',
+            'specialty',
+            'location',
+            'consultation_fee',
+            'consultationFee',
+            'experience_years',
+            'experienceYears',
+            'education',
+            'about',
+            'about_ar',
+            'aboutAr',
+            'hospital',
+            'clinic',
+            'hospitalId',
+            'clinicId',
+            'availableDays',
+            'standardSlots',
+            'status',
+        ]
+        read_only_fields = ['id']
+
+    def validate(self, attrs):
+        hospital_id = attrs.pop('hospitalId', None)
+        clinic_id = attrs.pop('clinicId', None)
+
+        if hospital_id:
+            from apps.facilities.models import Hospital
+            try:
+                attrs['hospital'] = Hospital.objects.get(id=hospital_id)
+            except Hospital.DoesNotExist:
+                raise serializers.ValidationError({'hospitalId': "Hospital does not exist."})
+
+        if clinic_id:
+            from apps.facilities.models import Clinic
+            try:
+                attrs['clinic'] = Clinic.objects.get(id=clinic_id)
+            except Clinic.DoesNotExist:
+                raise serializers.ValidationError({'clinicId': "Clinic does not exist."})
+
+        if attrs.get('hospital') and attrs.get('clinic'):
+            raise serializers.ValidationError("A doctor cannot belong to both a Hospital and a Clinic.")
+
+        return attrs
+
+    def create(self, validated_data):
+        available_days = validated_data.pop('availableDays', None)
+        standard_slots = validated_data.pop('standardSlots', None)
+
+        if not available_days:
+            available_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        if not standard_slots:
+            standard_slots = [
+                '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30', '10:30 - 11:00',
+                '11:00 - 11:30', '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '16:00 - 16:30'
+            ]
+
+        if not validated_data.get('experience_text') and validated_data.get('experience_years'):
+            validated_data['experience_text'] = f"{validated_data['experience_years']} years"
+            validated_data['experience_text_ar'] = f"{validated_data['experience_years']} سنوات"
+
+        doctor = super().create(validated_data)
+
+        DoctorSchedule.objects.create(
+            doctor=doctor,
+            available_days=available_days,
+            standard_slots=standard_slots,
+            slot_duration_minutes=30
+        )
+
+        return doctor
+
+

@@ -6,6 +6,7 @@ from django.conf import settings
 class ProviderType(models.TextChoices):
     HOSPITAL = 'hospital', 'Hospital'
     CLINIC = 'clinic', 'Clinic'
+    DOCTOR = 'doctor', 'Doctor'
 
 class RequestStatus(models.TextChoices):
     PENDING = 'pending', 'Pending Review'
@@ -13,7 +14,7 @@ class RequestStatus(models.TextChoices):
     REJECTED = 'rejected', 'Rejected'
 
 class ProviderRequest(models.Model):
-    """External partnership application submitted by a healthcare facility."""
+    """External partnership application submitted by a healthcare facility or individual doctor."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     provider_type = models.CharField(
         max_length=16,
@@ -27,7 +28,9 @@ class ProviderRequest(models.Model):
     email = models.EmailField()
     country = models.CharField(max_length=64, default='United Arab Emirates')
     location = models.CharField(max_length=128)
+    specialty = models.CharField(max_length=128, blank=True, default='', help_text='Doctor specialty or clinic focus')
     address = models.TextField(blank=True)
+    google_maps_url = models.URLField(max_length=500, blank=True, help_text='Google Maps location URL provided during onboarding')
     status = models.CharField(
         max_length=16,
         choices=RequestStatus.choices,
@@ -53,6 +56,13 @@ class ProviderRequest(models.Model):
     )
     clinic = models.ForeignKey(
         'facilities.Clinic',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='provider_requests'
+    )
+    doctor = models.ForeignKey(
+        'doctors.Doctor',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

@@ -10,6 +10,7 @@ from apps.accounts.permissions import IsPlatformAdmin
 from apps.doctors.models import Doctor
 from apps.doctors.serializers import (
     AdminDoctorListSerializer,
+    AdminDoctorCreateSerializer,
     AdminDoctorStatusUpdateSerializer,
 )
 from apps.audit.utils import log_audit_event
@@ -22,14 +23,42 @@ class AdminDoctorPagination(PageNumberPagination):
     max_page_size = 100
 
 
-class AdminDoctorListView(generics.ListAPIView):
+class AdminDoctorListView(generics.ListCreateAPIView):
     """
-    Platform administrator listing of all registered Doctors across Hospitals and Clinics.
+    Platform administrator listing and creation of Doctors.
     GET /api/v1/admin/doctors/
+    POST /api/v1/admin/doctors/
     """
     permission_classes = [IsPlatformAdmin]
-    serializer_class = AdminDoctorListSerializer
     pagination_class = AdminDoctorPagination
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return AdminDoctorCreateSerializer
+        return AdminDoctorListSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        doctor = serializer.save()
+
+        log_audit_event(
+            action="DOCTOR_CREATED",
+            target_model="Doctor",
+            target_id=str(doctor.id),
+            actor=request.user,
+            change_summary={
+                "name": doctor.name,
+                "specialty": doctor.specialty,
+                "location": doctor.location,
+                "hospital": doctor.hospital.name if doctor.hospital else None,
+                "clinic": doctor.clinic.name if doctor.clinic else None,
+            },
+            request=request
+        )
+
+        output_serializer = AdminDoctorListSerializer(doctor)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
     def get_queryset(self):
         queryset = Doctor.objects.all().select_related(

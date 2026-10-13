@@ -19,7 +19,7 @@ class Hospital(models.Model):
     )
     name = models.CharField(max_length=255)
     name_ar = models.CharField(max_length=255, blank=True)
-    photo = models.URLField(blank=True)
+    photo = models.TextField(blank=True)
     location = models.CharField(max_length=128)
     address = models.TextField()
     address_ar = models.TextField(blank=True)
@@ -29,6 +29,7 @@ class Hospital(models.Model):
     about = models.TextField()
     about_ar = models.TextField(blank=True)
     insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
+    google_maps_url = models.URLField(max_length=500, blank=True, help_text='Google Maps location URL for the hospital')
     emergency_available = models.BooleanField(default=False)
     status = models.CharField(
         max_length=16,
@@ -67,7 +68,7 @@ class Clinic(models.Model):
     )
     name = models.CharField(max_length=255)
     name_ar = models.CharField(max_length=255, blank=True)
-    photo = models.URLField(blank=True)
+    photo = models.TextField(blank=True)
     location = models.CharField(max_length=128)
     address = models.TextField()
     address_ar = models.TextField(blank=True)
@@ -78,6 +79,7 @@ class Clinic(models.Model):
     about = models.TextField()
     about_ar = models.TextField(blank=True)
     insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
+    google_maps_url = models.URLField(max_length=500, blank=True, help_text='Google Maps location URL for the clinic')
     status = models.CharField(
         max_length=16,
         choices=FacilityStatus.choices,

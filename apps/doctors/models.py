@@ -16,7 +16,7 @@ class Doctor(models.Model):
     )
     name = models.CharField(max_length=255)
     name_ar = models.CharField(max_length=255, blank=True)
-    photo = models.URLField(blank=True)
+    photo = models.TextField(blank=True)
     specialty = models.CharField(max_length=128, db_index=True)
     special_interests = models.JSONField(default=list, blank=True)
     experience_years = models.PositiveIntegerField(default=0)

@@ -14,6 +14,7 @@ from rest_framework.exceptions import NotFound, ValidationError, PermissionDenie
 from apps.accounts.models import User, UserRole
 from apps.accounts.permissions import IsPlatformAdmin
 from apps.facilities.models import Hospital, Clinic, FacilityStatus
+from apps.doctors.models import Doctor, DoctorSchedule
 from apps.onboarding.models import ProviderRequest, ProviderInvitationToken, ProviderType, RequestStatus
 from apps.onboarding.serializers import (
     ProviderRequestPublicCreateSerializer,
@@ -154,18 +155,20 @@ class AdminProviderRequestStatusView(views.APIView):
             # Atomic provisioning pipeline
             with transaction.atomic():
                 admin_email = app.email.lower().strip()
+                target_role = UserRole.DOCTOR if app.provider_type == ProviderType.DOCTOR else UserRole.HOSPITAL
                 
-                # Verify no conflicting active user exists with a different non-facility role
+                # Verify no conflicting active user exists with a different role
                 existing_user = User.objects.filter(email=admin_email).first()
-                if existing_user and existing_user.role not in [UserRole.HOSPITAL]:
+                if existing_user and existing_user.role != target_role:
                     return Response({
                         "error": "ValidationError",
                         "code": "USER_EMAIL_CONFLICT",
                         "message": f"A user account with email '{admin_email}' already exists with role '{existing_user.role}'."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                # 1. Create Facility (Status: 'Deactivated')
+                # 1. Create Facility or Doctor
                 facility = None
+                doctor = None
                 if app.provider_type == ProviderType.HOSPITAL:
                     facility = Hospital.objects.create(
                         name=app.name,
@@ -176,24 +179,51 @@ class AdminProviderRequestStatusView(views.APIView):
                         operating_hours="Mon - Sun: 08:00 - 20:00",
                         about=f"{app.name} is an accredited medical hospital affiliated with MeetAdr.",
                         emergency_available=True,
+                        google_maps_url=app.google_maps_url or '',
                         status=FacilityStatus.DEACTIVATED
                     )
                     app.hospital = facility
                     app.clinic = None
+                    app.doctor = None
                 elif app.provider_type == ProviderType.CLINIC:
                     facility = Clinic.objects.create(
                         name=app.name,
                         name_ar=app.name_ar,
                         location=app.location,
                         address=app.address or app.location,
-                        primary_specialty="General Medicine",
+                        primary_specialty=app.specialty or "General Medicine",
                         phone=app.contact_number,
                         operating_hours="Mon - Sat: 08:00 - 20:00",
                         about=f"{app.name} is an accredited specialized outpatient clinic affiliated with MeetAdr.",
+                        google_maps_url=app.google_maps_url or '',
                         status=FacilityStatus.DEACTIVATED
                     )
                     app.clinic = facility
                     app.hospital = None
+                    app.doctor = None
+                elif app.provider_type == ProviderType.DOCTOR:
+                    doctor = Doctor.objects.create(
+                        name=app.name,
+                        name_ar=app.name_ar,
+                        specialty=app.specialty or "General Physician",
+                        location=app.location,
+                        about=f"Dr. {app.name} is an independent medical practitioner affiliated with MeetAdr.",
+                        consultation_fee=100.00,
+                        experience_years=5,
+                        status=FacilityStatus.ACTIVE,
+                    )
+                    DoctorSchedule.objects.create(
+                        doctor=doctor,
+                        available_days=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+                        standard_slots=[
+                            '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30', '10:30 - 11:00',
+                            '11:00 - 11:30', '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '16:00 - 16:30'
+                        ],
+                        slot_duration_minutes=30
+                    )
+                    app.doctor = doctor
+                    app.hospital = None
+                    app.clinic = None
                 else:
                     return Response({
                         "error": "ValidationError",
@@ -201,29 +231,33 @@ class AdminProviderRequestStatusView(views.APIView):
                         "message": f"Unsupported provider type '{app.provider_type}'."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                # 2. Provision Facility Admin User
+                # 2. Provision Admin/Doctor User
                 if existing_user:
                     user = existing_user
-                    user.name = app.contact_person
+                    user.name = app.contact_person or app.name
                     user.phone = app.contact_number
-                    user.role = UserRole.HOSPITAL
+                    user.role = target_role
                     user.is_active = False
                     user.set_unusable_password()
                     user.save()
                 else:
                     user = User.objects.create(
                         email=admin_email,
-                        name=app.contact_person,
+                        name=app.contact_person or app.name,
                         phone=app.contact_number,
-                        role=UserRole.HOSPITAL,
+                        role=target_role,
                         is_active=False
                     )
                     user.set_unusable_password()
                     user.save()
 
-                # 3. Associate Admin User to Facility
-                facility.admin_user = user
-                facility.save(update_fields=['admin_user'])
+                # 3. Associate User
+                if facility:
+                    facility.admin_user = user
+                    facility.save(update_fields=['admin_user'])
+                elif doctor:
+                    doctor.user = user
+                    doctor.save(update_fields=['user'])
 
                 # 4. Generate Single-Use Cryptographic Setup Token
                 raw_token = secrets.token_urlsafe(48)
@@ -248,6 +282,7 @@ class AdminProviderRequestStatusView(views.APIView):
                 app.save()
 
                 # 6. Audit Logging (Zero token or credential leakage)
+                target_entity = doctor or facility
                 log_audit_event(
                     action="PROVIDER_APPLICATION_APPROVED",
                     target_model="ProviderRequest",
@@ -255,21 +290,21 @@ class AdminProviderRequestStatusView(views.APIView):
                     actor=request.user,
                     change_summary={
                         "provider_type": app.provider_type,
-                        "facility_name": app.name,
-                        "facility_id": str(facility.id),
+                        "name": app.name,
+                        "entity_id": str(target_entity.id),
                         "admin_email": user.email,
                     },
                     request=request
                 )
                 log_audit_event(
-                    action="FACILITY_CREATED",
-                    target_model=facility.__class__.__name__,
-                    target_id=str(facility.id),
+                    action="ENTITY_CREATED",
+                    target_model=target_entity.__class__.__name__,
+                    target_id=str(target_entity.id),
                     actor=request.user,
                     change_summary={
-                        "name": facility.name,
-                        "status": facility.status,
-                        "admin_user_id": str(user.id),
+                        "name": target_entity.name,
+                        "status": getattr(target_entity, 'status', 'active'),
+                        "user_id": str(user.id),
                     },
                     request=request
                 )
@@ -281,14 +316,14 @@ class AdminProviderRequestStatusView(views.APIView):
                     change_summary={
                         "user_id": str(user.id),
                         "user_email": user.email,
-                        "facility_id": str(facility.id),
+                        "entity_id": str(target_entity.id),
                         "expires_at": expires_at.isoformat(),
                     },
                     request=request
                 )
 
                 # 7. Dispatch Email
-                send_provider_invitation_email(user, facility, raw_token)
+                send_provider_invitation_email(user, target_entity, raw_token)
 
             return Response(AdminProviderRequestListSerializer(app).data, status=status.HTTP_200_OK)
 

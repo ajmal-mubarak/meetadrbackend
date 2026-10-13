@@ -12,11 +12,10 @@ class ProviderRequestPublicCreateSerializer(serializers.ModelSerializer):
     - Status is strictly enforced to 'pending' by the server.
     - All administrative review fields are read-only.
     """
-    provider_type = serializers.ChoiceField(
-        choices=ProviderType.choices,
-        error_messages={
-            'invalid_choice': "Invalid provider type. Only 'hospital' and 'clinic' are accepted."
-        }
+    provider_type = serializers.CharField(
+        max_length=64,
+        required=False,
+        default=ProviderType.HOSPITAL,
     )
     name = serializers.CharField(max_length=255, min_length=2)
     name_ar = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
@@ -25,7 +24,9 @@ class ProviderRequestPublicCreateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
     country = serializers.CharField(max_length=64, default='United Arab Emirates')
     location = serializers.CharField(max_length=128, min_length=2)
+    specialty = serializers.CharField(max_length=128, required=False, allow_blank=True, default='')
     address = serializers.CharField(required=False, allow_blank=True, default='')
+    google_maps_url = serializers.URLField(required=False, allow_blank=True, default='')
     admin_notes = serializers.CharField(required=False, allow_blank=True, default='')
 
     class Meta:
@@ -40,7 +41,9 @@ class ProviderRequestPublicCreateSerializer(serializers.ModelSerializer):
             'email',
             'country',
             'location',
+            'specialty',
             'address',
+            'google_maps_url',
             'status',
             'admin_notes',
             'submitted_at',
@@ -48,17 +51,14 @@ class ProviderRequestPublicCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'status', 'submitted_at']
 
     def validate_provider_type(self, value):
-        val = str(value).lower().strip()
-        if val == 'doctor':
-            raise serializers.ValidationError(
-                "Individual doctors must not register independently. "
-                "Provider onboarding is strictly for Hospitals and Clinics."
-            )
-        if val not in [ProviderType.HOSPITAL, ProviderType.CLINIC]:
-            raise serializers.ValidationError(
-                "Invalid provider type. Only 'hospital' and 'clinic' are permitted."
-            )
-        return val
+        val = str(value or '').lower().strip()
+        if val in ['doctor', 'individual_doctor', 'individual doctor']:
+            return ProviderType.DOCTOR
+        if val in ['hospital/clinic', 'hospital_clinic', 'hospital / clinic', 'facility', 'hospital', 'clinic']:
+            return ProviderType.CLINIC if val == 'clinic' else ProviderType.HOSPITAL
+        raise serializers.ValidationError(
+            "Invalid provider type. Accepted types are 'hospital', 'clinic', and 'doctor'."
+        )
 
     def validate_email(self, value):
         return value.lower().strip()
@@ -70,6 +70,7 @@ class ProviderRequestPublicCreateSerializer(serializers.ModelSerializer):
         validated_data.pop('reviewed_at', None)
         validated_data.pop('hospital', None)
         validated_data.pop('clinic', None)
+        validated_data.pop('doctor', None)
         return super().create(validated_data)
 
 class AdminProviderRequestListSerializer(serializers.ModelSerializer):
@@ -77,6 +78,8 @@ class AdminProviderRequestListSerializer(serializers.ModelSerializer):
     reviewed_by_email = serializers.SerializerMethodField()
     facility_id = serializers.SerializerMethodField()
     facility_name = serializers.SerializerMethodField()
+    doctor_id = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ProviderRequest
@@ -90,7 +93,9 @@ class AdminProviderRequestListSerializer(serializers.ModelSerializer):
             'email',
             'country',
             'location',
+            'specialty',
             'address',
+            'google_maps_url',
             'status',
             'admin_notes',
             'reviewed_by',
@@ -99,6 +104,8 @@ class AdminProviderRequestListSerializer(serializers.ModelSerializer):
             'submitted_at',
             'facility_id',
             'facility_name',
+            'doctor_id',
+            'doctor_name',
         ]
         read_only_fields = fields
 
@@ -118,6 +125,12 @@ class AdminProviderRequestListSerializer(serializers.ModelSerializer):
         if obj.clinic:
             return obj.clinic.name
         return None
+
+    def get_doctor_id(self, obj):
+        return str(obj.doctor_id) if obj.doctor_id else None
+
+    def get_doctor_name(self, obj):
+        return obj.doctor.name if obj.doctor else None
 
 class AdminProviderRequestStatusUpdateSerializer(serializers.Serializer):
     """Platform administrator approval/rejection state transition payload."""

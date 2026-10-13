@@ -16,7 +16,7 @@ class FacilitySettingsSerializer(serializers.Serializer):
     type = serializers.SerializerMethodField(read_only=True)
     name = serializers.CharField(max_length=255, required=False)
     name_ar = serializers.CharField(max_length=255, required=False, allow_blank=True)
-    photo = serializers.URLField(required=False, allow_blank=True)
+    photo = serializers.CharField(required=False, allow_blank=True)
     location = serializers.CharField(max_length=128, required=False)
     address = serializers.CharField(required=False)
     address_ar = serializers.CharField(required=False, allow_blank=True)
@@ -25,6 +25,7 @@ class FacilitySettingsSerializer(serializers.Serializer):
     operating_hours_ar = serializers.CharField(max_length=128, required=False, allow_blank=True)
     about = serializers.CharField(required=False)
     about_ar = serializers.CharField(required=False, allow_blank=True)
+    google_maps_url = serializers.URLField(required=False, allow_blank=True)
     emergency_available = serializers.BooleanField(required=False)
     insurance_plans = serializers.CharField(required=False, allow_blank=True)
     primary_specialty = serializers.CharField(max_length=128, required=False)
@@ -50,6 +51,7 @@ class FacilitySettingsSerializer(serializers.Serializer):
             'operating_hours_ar': instance.operating_hours_ar,
             'about': instance.about,
             'about_ar': instance.about_ar,
+            'google_maps_url': getattr(instance, 'google_maps_url', '') or '',
             'status': instance.status,
             'created_at': instance.created_at,
             'updated_at': instance.updated_at,
@@ -66,7 +68,8 @@ class FacilitySettingsSerializer(serializers.Serializer):
         # Permitted fields only
         permitted_fields = [
             'name', 'name_ar', 'photo', 'location', 'address', 'address_ar',
-            'phone', 'operating_hours', 'operating_hours_ar', 'about', 'about_ar'
+            'phone', 'operating_hours', 'operating_hours_ar', 'about', 'about_ar',
+            'google_maps_url'
         ]
         if isinstance(instance, Hospital):
             permitted_fields.append('emergency_available')
@@ -109,7 +112,7 @@ class AdminProviderCreateSerializer(serializers.Serializer):
     type = serializers.ChoiceField(choices=['hospital', 'clinic'], default='hospital')
     name = serializers.CharField(max_length=255)
     name_ar = serializers.CharField(max_length=255, required=False, allow_blank=True)
-    photo = serializers.URLField(required=False, allow_blank=True)
+    photo = serializers.CharField(required=False, allow_blank=True)
     location = serializers.CharField(max_length=128, default='Dubai')
     address = serializers.CharField(required=False, allow_blank=True)
     address_ar = serializers.CharField(required=False, allow_blank=True)
@@ -118,6 +121,7 @@ class AdminProviderCreateSerializer(serializers.Serializer):
     operating_hours_ar = serializers.CharField(max_length=128, required=False, allow_blank=True)
     about = serializers.CharField(required=False, allow_blank=True)
     about_ar = serializers.CharField(required=False, allow_blank=True)
+    google_maps_url = serializers.URLField(required=False, allow_blank=True)
     emergency_available = serializers.BooleanField(default=True)
     insurance_plans = serializers.CharField(required=False, allow_blank=True)
     primary_specialty = serializers.CharField(max_length=128, required=False, allow_blank=True)

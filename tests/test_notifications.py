@@ -320,8 +320,8 @@ class NotificationTests(TestCase):
         # 1. Patient notification
         patient_notif = Notification.objects.filter(user=self.patient_user).first()
         self.assertIsNotNone(patient_notif)
-        self.assertEqual(patient_notif.title, "Appointment Confirmed")
-        self.assertIn("Dr. John Smith", patient_notif.description)
+        self.assertEqual(patient_notif.title, "Booking Request Received")
+        self.assertIn("We've received your booking request for Dr.", patient_notif.description)
         self.assertEqual(patient_notif.notification_type, NotificationType.APPOINTMENT)
         self.assertNotIn("Regular heart checkup.", patient_notif.description)  # Zero clinical notes leakage
 
@@ -348,8 +348,8 @@ class NotificationTests(TestCase):
         # Notification recipient is the account holder (patient_user)
         patient_notif = Notification.objects.filter(user=self.patient_user).order_by('-created_at').first()
         self.assertIsNotNone(patient_notif)
-        self.assertEqual(patient_notif.title, "Appointment Confirmed")
-        self.assertEqual(patient_notif.description, "Your appointment for a dependent has been confirmed.")
+        self.assertEqual(patient_notif.title, "Booking Request Received")
+        self.assertIn("We've received your booking request for Dr.", patient_notif.description)
         self.assertNotIn("Tommy Smith", patient_notif.description)  # Masked per Requirement 14
         self.assertNotIn("Child pediatric checkup", patient_notif.description)
 
@@ -362,7 +362,7 @@ class NotificationTests(TestCase):
             hospital=self.hospital,
             date=date(2026, 10, 22),
             time_slot="09:00 - 09:30",
-            status=AppointmentStatus.CONFIRMED
+            status=AppointmentStatus.PENDING
         )
 
         self.client.force_authenticate(user=self.patient_user)

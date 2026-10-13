@@ -33,7 +33,7 @@ class HospitalListSerializer(serializers.ModelSerializer):
             'id', 'name', 'name_ar', 'photo', 'location',
             'address', 'address_ar', 'phone', 'operating_hours',
             'operating_hours_ar', 'about', 'about_ar',
-            'emergency_available', 'status', 'doctor_count', 'specialties',
+            'emergency_available', 'google_maps_url', 'status', 'doctor_count', 'specialties',
             'avg_rating', 'total_reviews',
         ]
 
@@ -97,7 +97,7 @@ class ClinicListSerializer(serializers.ModelSerializer):
             'id', 'name', 'name_ar', 'photo', 'location',
             'address', 'address_ar', 'primary_specialty',
             'phone', 'operating_hours', 'operating_hours_ar',
-            'about', 'about_ar', 'status', 'doctor_count',
+            'about', 'about_ar', 'google_maps_url', 'status', 'doctor_count',
             'avg_rating', 'total_reviews',
         ]
 

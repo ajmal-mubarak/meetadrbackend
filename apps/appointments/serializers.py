@@ -165,7 +165,9 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
     hospitalName = serializers.SerializerMethodField()
     
     specialty = serializers.CharField(source='specialty_snapshot', read_only=True)
-    location = serializers.CharField(source='doctor.location', read_only=True)
+    location = serializers.SerializerMethodField()
+    googleMapsUrl = serializers.SerializerMethodField()
+    google_maps_url = serializers.SerializerMethodField()
     
     time = serializers.CharField(source='time_slot', read_only=True)
     timeSlot = serializers.CharField(source='time_slot', read_only=True)
@@ -239,7 +241,27 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
             'isFacilityReviewed',
             'doctorReview',
             'facilityReview',
+            'googleMapsUrl',
+            'google_maps_url',
         ]
+
+    def get_location(self, obj):
+        if obj.hospital and obj.hospital.location:
+            return obj.hospital.location
+        if obj.clinic and obj.clinic.location:
+            return obj.clinic.location
+        if obj.doctor and obj.doctor.location:
+            return obj.doctor.location
+        return ''
+
+    def get_googleMapsUrl(self, obj):
+        facility = obj.hospital or obj.clinic
+        if facility and getattr(facility, 'google_maps_url', None):
+            return facility.google_maps_url
+        return ''
+
+    def get_google_maps_url(self, obj):
+        return self.get_googleMapsUrl(obj)
 
     def get_patientId(self, obj):
         if obj.dependent_id:

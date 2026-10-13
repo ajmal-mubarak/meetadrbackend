@@ -278,6 +278,7 @@ class AdminProviderListView(views.APIView):
                     'location': h.location,
                     'address': h.address,
                     'phone': h.phone,
+                    'google_maps_url': h.google_maps_url or '',
                     'status': h.status,
                     'admin_email': h.admin_user.email if h.admin_user else None,
                     'created_at': h.created_at,
@@ -309,6 +310,7 @@ class AdminProviderListView(views.APIView):
                     'location': c.location,
                     'address': c.address,
                     'phone': c.phone,
+                    'google_maps_url': c.google_maps_url or '',
                     'status': c.status,
                     'admin_email': c.admin_user.email if c.admin_user else None,
                     'created_at': c.created_at,
@@ -337,6 +339,7 @@ class AdminProviderListView(views.APIView):
         operating_hours_ar = data.get('operating_hours_ar') or ''
         about = data.get('about') or f"{name} is an accredited medical healthcare provider."
         about_ar = data.get('about_ar') or ''
+        google_maps_url = data.get('google_maps_url') or ''
 
         if p_type == 'hospital':
             facility = Hospital.objects.create(
@@ -351,6 +354,7 @@ class AdminProviderListView(views.APIView):
                 operating_hours_ar=operating_hours_ar,
                 about=about,
                 about_ar=about_ar,
+                google_maps_url=google_maps_url,
                 emergency_available=data.get('emergency_available', True),
                 insurance_plans=data.get('insurance_plans', ''),
                 status=FacilityStatus.ACTIVE
@@ -368,6 +372,7 @@ class AdminProviderListView(views.APIView):
                 operating_hours_ar=operating_hours_ar,
                 about=about,
                 about_ar=about_ar,
+                google_maps_url=google_maps_url,
                 primary_specialty=data.get('primary_specialty') or 'General Medicine',
                 status=FacilityStatus.ACTIVE
             )
@@ -377,7 +382,7 @@ class AdminProviderListView(views.APIView):
             target_model=facility.__class__.__name__,
             target_id=str(facility.id),
             actor=request.user,
-            change_summary={"name": facility.name, "type": p_type, "location": facility.location},
+            change_summary={"name": facility.name, "type": p_type, "location": facility.location, "google_maps_url": google_maps_url},
             request=request
         )
 
@@ -390,6 +395,7 @@ class AdminProviderListView(views.APIView):
             'location': facility.location,
             'address': facility.address,
             'phone': facility.phone,
+            'google_maps_url': facility.google_maps_url or '',
             'status': facility.status,
             'admin_email': None,
             'created_at': facility.created_at,
