@@ -3,10 +3,12 @@ from rest_framework import serializers
 from apps.doctors.models import Doctor, DoctorSchedule
 from apps.facilities.models import Hospital, Clinic, FacilityStatus
 
-DEFAULT_AVAILABLE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday']
+DEFAULT_AVAILABLE_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 DEFAULT_STANDARD_SLOTS = [
-    '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30',
-    '11:00 - 11:30', '14:00 - 14:30', '15:00 - 15:30'
+    '08:00 - 08:30', '08:30 - 09:00', '09:00 - 09:30', '09:30 - 10:00',
+    '10:00 - 10:30', '10:30 - 11:00', '11:00 - 11:30', '11:30 - 12:00',
+    '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '15:30 - 16:00',
+    '16:00 - 16:30', '16:30 - 17:00'
 ]
 
 class FacilityDoctorSerializer(serializers.ModelSerializer):
@@ -39,6 +41,9 @@ class FacilityDoctorSerializer(serializers.ModelSerializer):
         required=False,
         allow_blank=True
     )
+    username = serializers.CharField(required=False, write_only=True, allow_blank=True)
+    password = serializers.CharField(required=False, write_only=True, allow_blank=True)
+    email = serializers.CharField(required=False, write_only=True, allow_blank=True)
     facility_id = serializers.SerializerMethodField()
     facility_name = serializers.SerializerMethodField()
     facility_type = serializers.SerializerMethodField()
@@ -69,6 +74,9 @@ class FacilityDoctorSerializer(serializers.ModelSerializer):
             'available_days',
             'standard_slots',
             'slot_duration_minutes',
+            'username',
+            'password',
+            'email',
             'created_at',
             'updated_at',
         ]
@@ -122,9 +130,17 @@ class FacilityDoctorSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Authorized facility context is required.")
 
         # Extract schedule data
-        available_days = validated_data.pop('available_days', DEFAULT_AVAILABLE_DAYS)
-        standard_slots = validated_data.pop('standard_slots', DEFAULT_STANDARD_SLOTS)
+        fac_days = getattr(facility, 'default_available_days', None)
+        fac_slots = getattr(facility, 'default_standard_slots', None)
+        default_days = list(fac_days) if (fac_days and len(fac_days) > 0) else DEFAULT_AVAILABLE_DAYS
+        default_slots = list(fac_slots) if (fac_slots and len(fac_slots) > 0) else DEFAULT_STANDARD_SLOTS
+
+        available_days = validated_data.pop('available_days', None) or default_days
+        standard_slots = validated_data.pop('standard_slots', None) or default_slots
         slot_duration = validated_data.pop('slot_duration_minutes', 30)
+        username = validated_data.pop('username', None)
+        password = validated_data.pop('password', None)
+        email = validated_data.pop('email', None)
 
         # Disallow mass assignment of internal fields
         for forbidden in ['hospital', 'clinic', 'hospital_id', 'clinic_id', 'rating', 'review_count', 'status', 'user']:
@@ -142,6 +158,31 @@ class FacilityDoctorSerializer(serializers.ModelSerializer):
             validated_data['location'] = getattr(facility, 'location', 'United Arab Emirates')
 
         validated_data['status'] = FacilityStatus.ACTIVE
+
+        # Create or link User account if username, email, or password provided
+        user_login = (username or email or '').strip().lower()
+        if user_login:
+            from apps.accounts.models import User, UserRole
+            user_email = user_login if '@' in user_login else f"{user_login}@meetadr.ae"
+            matched_user = User.objects.filter(email__iexact=user_email).first()
+            if matched_user:
+                if matched_user.role != UserRole.DOCTOR:
+                    raise serializers.ValidationError({"username": "A user with this username/email already exists."})
+                if password:
+                    matched_user.set_password(password)
+                    matched_user.save()
+                validated_data['user'] = matched_user
+            else:
+                doctor_user = User.objects.create(
+                    email=user_email,
+                    name=validated_data.get('name', 'Doctor'),
+                    role=UserRole.DOCTOR,
+                    is_active=True,
+                )
+                if password:
+                    doctor_user.set_password(password)
+                    doctor_user.save()
+                validated_data['user'] = doctor_user
 
         doctor = Doctor.objects.create(**validated_data)
 
@@ -161,24 +202,26 @@ class FacilityDoctorSerializer(serializers.ModelSerializer):
             validated_data.pop(forbidden, None)
 
         # Schedule updates
+        days = validated_data.pop('available_days', None)
+        slots = validated_data.pop('standard_slots', None)
+        slot_duration = validated_data.pop('slot_duration_minutes', None)
+
         schedule = getattr(instance, 'schedule', None)
         if schedule:
-            schedule_updated = False
-            if 'available_days' in validated_data:
-                schedule.available_days = validated_data.pop('available_days')
-                schedule_updated = True
-            if 'standard_slots' in validated_data:
-                schedule.standard_slots = validated_data.pop('standard_slots')
-                schedule_updated = True
-            if 'slot_duration_minutes' in validated_data:
-                schedule.slot_duration_minutes = validated_data.pop('slot_duration_minutes')
-                schedule_updated = True
-            if schedule_updated:
-                schedule.save()
-        else:
-            validated_data.pop('available_days', None)
-            validated_data.pop('standard_slots', None)
-            validated_data.pop('slot_duration_minutes', None)
+            if days is not None:
+                schedule.available_days = days
+            if slots is not None:
+                schedule.standard_slots = slots
+            if slot_duration is not None:
+                schedule.slot_duration_minutes = slot_duration
+            schedule.save()
+        elif days is not None or slots is not None:
+            DoctorSchedule.objects.create(
+                doctor=instance,
+                available_days=days if days is not None else DEFAULT_AVAILABLE_DAYS,
+                standard_slots=slots if slots is not None else DEFAULT_STANDARD_SLOTS,
+                slot_duration_minutes=slot_duration or 30
+            )
 
         return super().update(instance, validated_data)
 

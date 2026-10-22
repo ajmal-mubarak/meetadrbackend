@@ -1,4 +1,5 @@
-"""Accounts, Authentication and Patient Profile Serializers."""
+import re
+from datetime import date
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth import authenticate
@@ -154,7 +155,15 @@ class PatientRegisterSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=True)
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
+    phone = serializers.CharField(max_length=32, required=True)
+    gender = serializers.CharField(max_length=16, required=False, allow_blank=True, default='')
+    dob = serializers.DateField(required=False, allow_null=True, default=None)
+
+    def validate_name(self, value):
+        val = value.strip()
+        if len(val) < 2:
+            raise serializers.ValidationError("Full name must be at least 2 characters long.")
+        return val
 
     def validate_email(self, value):
         normalized_email = value.lower().strip()
@@ -163,7 +172,29 @@ class PatientRegisterSerializer(serializers.Serializer):
         return normalized_email
 
     def validate_password(self, value):
+        if len(value) < 10:
+            raise serializers.ValidationError("Password must contain at least 10 characters.")
         validate_password(value)
+        return value
+
+    def validate_phone(self, value):
+        val = value.strip()
+        clean = re.sub(r'[\s\-()]', '', val)
+        if not re.match(r'^\+[0-9]{7,15}$', clean):
+            raise serializers.ValidationError("Phone number must include a country code and numbers only (e.g. +971501234567).")
+        return clean
+
+    def validate_gender(self, value):
+        if not value:
+            return ''
+        val = value.strip().capitalize()
+        if val not in ['Male', 'Female']:
+            raise serializers.ValidationError("Please select a valid gender (Male or Female).")
+        return val
+
+    def validate_dob(self, value):
+        if value and value >= date.today():
+            raise serializers.ValidationError("Date of birth must be in the past.")
         return value
 
     def create(self, validated_data):
@@ -176,34 +207,45 @@ class PatientRegisterSerializer(serializers.Serializer):
             is_staff=False,
             is_superuser=False
         )
-        # Ensure a clean PatientProfile is created for every new patient
-        PatientProfile.objects.create(user=user)
+        # Ensure a clean PatientProfile is created for every new patient with demographic data
+        PatientProfile.objects.create(
+            user=user,
+            gender=validated_data.get('gender', ''),
+            dob=validated_data.get('dob')
+        )
         return user
 
 class LoginSerializer(serializers.Serializer):
-    """Credentials authentication serializer."""
-    email = serializers.EmailField(required=True)
+    """Credentials authentication serializer supporting email or username."""
+    email = serializers.CharField(required=True)
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
 
     def validate(self, attrs):
-        email = attrs.get('email', '').lower().strip()
+        login_input = attrs.get('email', '').lower().strip()
         password = attrs.get('password', '')
 
-        if not email or not password:
-            raise AuthenticationFailed("Must include both email and password.")
+        if not login_input or not password:
+            raise AuthenticationFailed("Must include both username/email and password.")
+
+        candidates = [login_input]
+        if '@' not in login_input:
+            candidates.append(f"{login_input}@meetadr.ae")
 
         req = self.context.get('request')
-        user = authenticate(request=req, username=email, password=password)
-        if not user:
-            user = authenticate(request=req, email=email, password=password)
-        if not user:
-            # Bulletproof fallback: check user directly by case-insensitive email
-            matched = User.objects.filter(email__iexact=email).first()
-            if matched and matched.check_password(password):
-                user = matched
+        user = None
+        for cand in candidates:
+            user = authenticate(request=req, username=cand, password=password)
+            if not user:
+                user = authenticate(request=req, email=cand, password=password)
+            if not user:
+                matched = User.objects.filter(email__iexact=cand).first()
+                if matched and matched.check_password(password):
+                    user = matched
+            if user:
+                break
 
         if not user:
-            raise AuthenticationFailed("Invalid email or password.")
+            raise AuthenticationFailed("Invalid username/email or password.")
         if not user.is_active:
             raise AuthenticationFailed("This account has been deactivated.")
 

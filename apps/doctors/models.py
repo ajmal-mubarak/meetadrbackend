@@ -46,7 +46,7 @@ class Doctor(models.Model):
         null=True,
         blank=True
     )
-    rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.00)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     review_count = models.PositiveIntegerField(default=0)
     status = models.CharField(
         max_length=16,

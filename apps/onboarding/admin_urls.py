@@ -10,15 +10,20 @@ from apps.facilities.facility_views import (
     AdminProviderListView,
     AdminProviderStatusView,
     AdminProviderDetailView,
+    AdminProviderBulkActionView,
 )
 from apps.doctors.admin_views import (
     AdminDoctorListView,
+    AdminDoctorDetailView,
     AdminDoctorStatusView,
+    AdminDoctorBulkActionView,
 )
 from apps.appointments.admin_views import (
     AdminBookingListView,
     AdminBookingCancelView,
     AdminReportsView,
+    AdminPatientListView,
+    AdminPatientDetailView,
 )
 
 app_name = 'admin_onboarding'
@@ -32,12 +37,19 @@ urlpatterns = [
 
     # Provider facilities global oversight: /api/v1/admin/providers/
     path('providers/', AdminProviderListView.as_view(), name='admin_provider_list'),
+    path('providers/bulk-action/', AdminProviderBulkActionView.as_view(), name='admin_provider_bulk_action'),
     path('providers/<uuid:pk>/', AdminProviderDetailView.as_view(), name='admin_provider_detail'),
     path('providers/<uuid:pk>/status/', AdminProviderStatusView.as_view(), name='admin_provider_status'),
 
     # Platform-wide doctor management: /api/v1/admin/doctors/
     path('doctors/', AdminDoctorListView.as_view(), name='admin_doctor_list'),
+    path('doctors/bulk-action/', AdminDoctorBulkActionView.as_view(), name='admin_doctor_bulk_action'),
+    path('doctors/<uuid:pk>/', AdminDoctorDetailView.as_view(), name='admin_doctor_detail'),
     path('doctors/<uuid:pk>/status/', AdminDoctorStatusView.as_view(), name='admin_doctor_status'),
+
+    # Platform-wide patient management: /api/v1/admin/patients/
+    path('patients/', AdminPatientListView.as_view(), name='admin_patient_list'),
+    path('patients/<uuid:pk>/', AdminPatientDetailView.as_view(), name='admin_patient_detail'),
 
     # Platform-wide global bookings oversight & cancellation: /api/v1/admin/bookings/
     path('bookings/', AdminBookingListView.as_view(), name='admin_booking_list'),

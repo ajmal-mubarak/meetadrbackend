@@ -285,6 +285,10 @@ class AdminProviderListView(views.APIView):
                     'avg_rating': round(float(avg_val), 1) if avg_val is not None else None,
                     'total_reviews': total_revs,
                     'total_doctors': doc_count,
+                    'default_available_days': h.default_available_days or [],
+                    'default_standard_slots': h.default_standard_slots or [],
+                    'defaultAvailableDays': h.default_available_days or [],
+                    'defaultStandardSlots': h.default_standard_slots or [],
                 })
 
         if not provider_type or provider_type.lower() in ['all', 'clinic']:
@@ -317,6 +321,10 @@ class AdminProviderListView(views.APIView):
                     'avg_rating': round(float(avg_val), 1) if avg_val is not None else None,
                     'total_reviews': total_revs,
                     'total_doctors': doc_count,
+                    'default_available_days': c.default_available_days or [],
+                    'default_standard_slots': c.default_standard_slots or [],
+                    'defaultAvailableDays': c.default_available_days or [],
+                    'defaultStandardSlots': c.default_standard_slots or [],
                 })
 
         results.sort(key=lambda x: str(x['name']))
@@ -407,10 +415,119 @@ class AdminProviderListView(views.APIView):
 
 class AdminProviderDetailView(views.APIView):
     """
-    Platform administrator detail and deletion endpoint for Hospitals and Clinics.
+    Platform administrator detail, edit, and deletion endpoint for Hospitals and Clinics.
+    GET /api/v1/admin/providers/{id}/
+    PATCH /api/v1/admin/providers/{id}/
     DELETE /api/v1/admin/providers/{id}/
     """
     permission_classes = [IsPlatformAdmin]
+
+    def _get_facility(self, pk):
+        facility = Hospital.objects.filter(id=pk).first() or Clinic.objects.filter(id=pk).first()
+        if not facility:
+            raise NotFound("Provider facility not found.")
+        return facility
+
+    def get(self, request, pk):
+        facility = self._get_facility(pk)
+        p_type = 'hospital' if isinstance(facility, Hospital) else 'clinic'
+        return Response({
+            'id': str(facility.id),
+            'type': p_type,
+            'name': facility.name,
+            'name_ar': facility.name_ar,
+            'photo': facility.photo or '',
+            'location': facility.location,
+            'address': facility.address,
+            'address_ar': facility.address_ar if hasattr(facility, 'address_ar') else '',
+            'phone': facility.phone,
+            'operating_hours': facility.operating_hours,
+            'about': facility.about,
+            'google_maps_url': facility.google_maps_url or '',
+            'status': facility.status,
+            'emergency_available': getattr(facility, 'emergency_available', False),
+            'insurance_plans': getattr(facility, 'insurance_plans', ''),
+            'primary_specialty': getattr(facility, 'primary_specialty', ''),
+            'default_available_days': getattr(facility, 'default_available_days', []) or [],
+            'default_standard_slots': getattr(facility, 'default_standard_slots', []) or [],
+            'defaultAvailableDays': getattr(facility, 'default_available_days', []) or [],
+            'defaultStandardSlots': getattr(facility, 'default_standard_slots', []) or [],
+        }, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        facility = self._get_facility(pk)
+        data = request.data
+
+        if 'name' in data and data['name']:
+            facility.name = data['name'].strip()
+        if 'name_ar' in data:
+            facility.name_ar = (data['name_ar'] or '').strip()
+        if 'photo' in data:
+            facility.photo = data['photo'] or ''
+        if 'location' in data and data['location']:
+            facility.location = data['location'].strip()
+        if 'address' in data:
+            facility.address = (data['address'] or '').strip()
+        if 'address_ar' in data and hasattr(facility, 'address_ar'):
+            facility.address_ar = (data['address_ar'] or '').strip()
+        if 'phone' in data:
+            facility.phone = (data['phone'] or '').strip()
+        if 'operating_hours' in data:
+            facility.operating_hours = (data['operating_hours'] or '').strip()
+        if 'about' in data:
+            facility.about = (data['about'] or '').strip()
+        if 'about_ar' in data:
+            facility.about_ar = (data['about_ar'] or '').strip()
+        if 'google_maps_url' in data:
+            facility.google_maps_url = (data['google_maps_url'] or '').strip()
+        if 'status' in data and data['status']:
+            facility.status = data['status']
+        if 'emergency_available' in data and hasattr(facility, 'emergency_available'):
+            facility.emergency_available = bool(data['emergency_available'])
+        if 'insurance_plans' in data and hasattr(facility, 'insurance_plans'):
+            facility.insurance_plans = data['insurance_plans'] or ''
+        if 'primary_specialty' in data and hasattr(facility, 'primary_specialty'):
+            facility.primary_specialty = data['primary_specialty'] or ''
+        if 'default_available_days' in data:
+            facility.default_available_days = data['default_available_days'] or []
+        elif 'defaultAvailableDays' in data:
+            facility.default_available_days = data['defaultAvailableDays'] or []
+        if 'default_standard_slots' in data:
+            facility.default_standard_slots = data['default_standard_slots'] or []
+        elif 'defaultStandardSlots' in data:
+            facility.default_standard_slots = data['defaultStandardSlots'] or []
+
+        facility.save()
+
+        p_type = 'hospital' if isinstance(facility, Hospital) else 'clinic'
+        log_audit_event(
+            action="FACILITY_UPDATED",
+            target_model=facility.__class__.__name__,
+            target_id=str(pk),
+            actor=request.user,
+            change_summary={"name": facility.name},
+            request=request
+        )
+
+        return Response({
+            'id': str(facility.id),
+            'type': p_type,
+            'name': facility.name,
+            'name_ar': facility.name_ar,
+            'photo': facility.photo or '',
+            'location': facility.location,
+            'address': facility.address,
+            'phone': facility.phone,
+            'operating_hours': facility.operating_hours,
+            'about': facility.about,
+            'google_maps_url': facility.google_maps_url or '',
+            'status': facility.status,
+            'default_available_days': getattr(facility, 'default_available_days', []) or [],
+            'default_standard_slots': getattr(facility, 'default_standard_slots', []) or [],
+            'defaultAvailableDays': getattr(facility, 'default_available_days', []) or [],
+            'defaultStandardSlots': getattr(facility, 'default_standard_slots', []) or [],
+            'message': f"{p_type.capitalize()} '{facility.name}' updated successfully."
+        }, status=status.HTTP_200_OK)
 
     def delete(self, request, pk):
         facility = Hospital.objects.filter(id=pk).first() or Clinic.objects.filter(id=pk).first()
@@ -441,6 +558,85 @@ class AdminProviderDetailView(views.APIView):
             "id": str(pk),
             "message": f"{fac_type} '{fac_name}' deleted successfully."
         }, status=status.HTTP_200_OK)
+
+
+class AdminProviderBulkActionView(views.APIView):
+    """
+    Platform administrator bulk actions for Hospitals and Clinics (Activate, Deactivate, Delete).
+    POST /api/v1/admin/providers/bulk-action/
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        action = request.data.get('action')
+        provider_ids = request.data.get('provider_ids', [])
+
+        if not action or not isinstance(provider_ids, list) or len(provider_ids) == 0:
+            return Response({"error": "action and provider_ids array required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_uuids = []
+        for pid in provider_ids:
+            try:
+                valid_uuids.append(uuid.UUID(str(pid)))
+            except (ValueError, TypeError):
+                continue
+
+        hospitals = Hospital.objects.filter(id__in=valid_uuids)
+        clinics = Clinic.objects.filter(id__in=valid_uuids)
+        total_count = hospitals.count() + clinics.count()
+
+        if action == 'activate':
+            hospitals.update(status=FacilityStatus.ACTIVE)
+            clinics.update(status=FacilityStatus.ACTIVE)
+            log_audit_event(
+                action="BULK_FACILITIES_ACTIVATED",
+                target_model="Facility",
+                target_id="bulk",
+                actor=request.user,
+                change_summary={"count": total_count},
+                request=request
+            )
+            return Response({"message": f"Successfully activated {total_count} facilities.", "count": total_count})
+
+        elif action == 'deactivate':
+            hospitals.update(status=FacilityStatus.DEACTIVATED)
+            clinics.update(status=FacilityStatus.DEACTIVATED)
+            log_audit_event(
+                action="BULK_FACILITIES_DEACTIVATED",
+                target_model="Facility",
+                target_id="bulk",
+                actor=request.user,
+                change_summary={"count": total_count},
+                request=request
+            )
+            return Response({"message": f"Successfully deactivated {total_count} facilities.", "count": total_count})
+
+        elif action == 'delete':
+            with transaction.atomic():
+                for h in hospitals:
+                    if hasattr(h, 'doctors'):
+                        h.doctors.update(hospital=None)
+                    if hasattr(h, 'appointments'):
+                        h.appointments.update(hospital=None)
+                    h.delete()
+                for c in clinics:
+                    if hasattr(c, 'doctors'):
+                        c.doctors.update(clinic=None)
+                    if hasattr(c, 'appointments'):
+                        c.appointments.update(clinic=None)
+                    c.delete()
+
+            log_audit_event(
+                action="BULK_FACILITIES_DELETED",
+                target_model="Facility",
+                target_id="bulk",
+                actor=request.user,
+                change_summary={"count": total_count},
+                request=request
+            )
+            return Response({"message": f"Successfully deleted {total_count} facilities.", "count": total_count})
+
+        return Response({"error": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)
 
 class AdminProviderStatusView(views.APIView):
     """

@@ -29,6 +29,8 @@ class FacilitySettingsSerializer(serializers.Serializer):
     emergency_available = serializers.BooleanField(required=False)
     insurance_plans = serializers.CharField(required=False, allow_blank=True)
     primary_specialty = serializers.CharField(max_length=128, required=False)
+    default_available_days = serializers.JSONField(required=False)
+    default_standard_slots = serializers.JSONField(required=False)
     status = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
@@ -52,6 +54,10 @@ class FacilitySettingsSerializer(serializers.Serializer):
             'about': instance.about,
             'about_ar': instance.about_ar,
             'google_maps_url': getattr(instance, 'google_maps_url', '') or '',
+            'default_available_days': getattr(instance, 'default_available_days', []) or [],
+            'default_standard_slots': getattr(instance, 'default_standard_slots', []) or [],
+            'defaultAvailableDays': getattr(instance, 'default_available_days', []) or [],
+            'defaultStandardSlots': getattr(instance, 'default_standard_slots', []) or [],
             'status': instance.status,
             'created_at': instance.created_at,
             'updated_at': instance.updated_at,
@@ -69,7 +75,8 @@ class FacilitySettingsSerializer(serializers.Serializer):
         permitted_fields = [
             'name', 'name_ar', 'photo', 'location', 'address', 'address_ar',
             'phone', 'operating_hours', 'operating_hours_ar', 'about', 'about_ar',
-            'google_maps_url'
+            'google_maps_url', 'insurance_plans', 'emergency_available', 'primary_specialty',
+            'default_available_days', 'default_standard_slots',
         ]
         if isinstance(instance, Hospital):
             permitted_fields.append('emergency_available')

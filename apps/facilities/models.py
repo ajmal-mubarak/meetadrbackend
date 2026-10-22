@@ -31,6 +31,16 @@ class Hospital(models.Model):
     insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
     google_maps_url = models.URLField(max_length=500, blank=True, help_text='Google Maps location URL for the hospital')
     emergency_available = models.BooleanField(default=False)
+    default_available_days = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Default active weekdays for newly added doctors"
+    )
+    default_standard_slots = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Default consultation intervals for newly added doctors"
+    )
     status = models.CharField(
         max_length=16,
         choices=FacilityStatus.choices,
@@ -80,6 +90,16 @@ class Clinic(models.Model):
     about_ar = models.TextField(blank=True)
     insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
     google_maps_url = models.URLField(max_length=500, blank=True, help_text='Google Maps location URL for the clinic')
+    default_available_days = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Default active weekdays for newly added doctors"
+    )
+    default_standard_slots = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Default consultation intervals for newly added doctors"
+    )
     status = models.CharField(
         max_length=16,
         choices=FacilityStatus.choices,

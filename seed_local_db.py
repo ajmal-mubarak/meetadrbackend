@@ -304,7 +304,7 @@ with transaction.atomic():
         (h3, [('Cardiac Surgery', 'Dr. James OBrien', 20), ('Transplant Medicine', 'Dr. Amira Youssef', 15)]),
         (h4, [('Emergency Medicine', 'Dr. Khalil Ibrahim', 80), ('Orthopedics', 'Dr. Tariq Al Qasim', 30)]),
         (h5, [('Obstetrics & Gynecology', 'Dr. Hana Al Rashidi', 45), ('Neonatology', 'Dr. Mohamed Al Amin', 20)]),
-        (h6, [('General Surgery', 'Dr. Priya Nair', 25), ('Gastroenterology', 'Dr. Faisal Al Habsi', 20)]),
+        (h6, [('General Surgery', 'Dr. Priya Nair', 25), ('Gastroenterology', 'Dr. Faisal Al Habsi', 20), ('Pulmonology', 'Dr. Aisha Al Hashmi', 20)]),
     ]
 
     for hospital, depts in dept_data:
@@ -443,6 +443,41 @@ with transaction.atomic():
             'Senior consultant ENT and head & neck surgeon specializing in endoscopic sinus surgery, pediatric otolaryngology, and hearing disorder treatments.',
             'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400',
             ['Monday', 'Wednesday', 'Thursday', 'Saturday'], SLOTS_AFTERNOON
+        ),
+        (
+            'Dr. David Kim', 'د. ديفيد كيم', 'Orthopedics', h1, None, None,
+            'Dubai', 15, 650,
+            'Senior consultant orthopedic surgeon at American Hospital Dubai specializing in spine care, joint replacement, leg and back pain, and sports medicine.',
+            'https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&q=80&w=400',
+            WEEK_DAYS, SLOTS_ALL
+        ),
+        (
+            'Dr. James Okafor', 'د. جيمس أوكافور', 'General Practice', h1, None, None,
+            'Dubai', 12, 350,
+            'Family medicine and general practitioner at American Hospital Dubai providing routine wellness, diabetes care, and acute consultations.',
+            'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400',
+            WEEK_DAYS, SLOTS_MORNING
+        ),
+        (
+            'Dr. Salem Al Nuaimi', 'د. سالم النعيمي', 'Orthopedics', h5, None, None,
+            'Abu Dhabi', 17, 600,
+            'Lead orthopedic surgeon at Burjeel Hospital Abu Dhabi specializing in knee & hip surgery, sciatica, leg pain, and musculoskeletal rehabilitation.',
+            'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=400',
+            WEEK_DAYS, SLOTS_ALL
+        ),
+        (
+            'Dr. Mariam Al Suwaidi', 'د. مريم السويدي', 'General Practice', h5, None, None,
+            'Abu Dhabi', 10, 320,
+            'Consultant general practitioner at Burjeel Hospital Abu Dhabi specializing in comprehensive primary care, family medicine, and preventative health.',
+            'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400',
+            WEEK_DAYS, SLOTS_MORNING
+        ),
+        (
+            'Dr. Aisha Al Hashmi', 'د. عائشة الهاشمي', 'Pulmonology', h6, None, None,
+            'Dubai', 14, 480,
+            'Specialist pulmonologist and respiratory consultant at Aster Hospital Mankhool specializing in asthma, allergies, chronic bronchitis, and chest medicine.',
+            'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400',
+            WEEK_DAYS, SLOTS_ALL
         ),
     ]
 

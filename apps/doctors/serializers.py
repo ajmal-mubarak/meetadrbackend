@@ -238,6 +238,7 @@ class AdminDoctorListSerializer(DoctorListSerializer):
     specialInterest = serializers.JSONField(source='special_interests', read_only=True)
     availableDays = serializers.SerializerMethodField()
     availableSlots = serializers.SerializerMethodField()
+    available_slots = serializers.SerializerMethodField()
 
     class Meta(DoctorListSerializer.Meta):
         fields = DoctorListSerializer.Meta.fields + [
@@ -251,6 +252,7 @@ class AdminDoctorListSerializer(DoctorListSerializer):
             'specialInterest',
             'availableDays',
             'availableSlots',
+            'available_slots',
         ]
 
     def get_experience(self, obj):
@@ -278,6 +280,9 @@ class AdminDoctorListSerializer(DoctorListSerializer):
             return obj.schedule.standard_slots
         return []
 
+    def get_available_slots(self, obj):
+        return self.get_availableSlots(obj)
+
 
 class AdminDoctorStatusUpdateSerializer(serializers.Serializer):
     """
@@ -300,6 +305,9 @@ class AdminDoctorCreateSerializer(serializers.ModelSerializer):
     clinicId = serializers.UUIDField(required=False, allow_null=True)
     availableDays = serializers.ListField(child=serializers.CharField(), required=False)
     standardSlots = serializers.ListField(child=serializers.CharField(), required=False)
+    username = serializers.CharField(required=False, write_only=True, allow_blank=True)
+    password = serializers.CharField(required=False, write_only=True, allow_blank=True)
+    email = serializers.CharField(required=False, write_only=True, allow_blank=True)
 
     class Meta:
         model = Doctor
@@ -326,6 +334,9 @@ class AdminDoctorCreateSerializer(serializers.ModelSerializer):
             'availableDays',
             'standardSlots',
             'status',
+            'username',
+            'password',
+            'email',
         ]
         read_only_fields = ['id']
 
@@ -355,18 +366,63 @@ class AdminDoctorCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         available_days = validated_data.pop('availableDays', None)
         standard_slots = validated_data.pop('standardSlots', None)
+        username = validated_data.pop('username', None)
+        password = validated_data.pop('password', None)
+        email = validated_data.pop('email', None)
+
+        facility = validated_data.get('hospital') or validated_data.get('clinic')
+        facility_days = getattr(facility, 'default_available_days', None) if facility else None
+        facility_slots = getattr(facility, 'default_standard_slots', None) if facility else None
 
         if not available_days:
-            available_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+            if facility_days and len(facility_days) > 0:
+                available_days = list(facility_days)
+            else:
+                available_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
         if not standard_slots:
-            standard_slots = [
-                '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30', '10:30 - 11:00',
-                '11:00 - 11:30', '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '16:00 - 16:30'
-            ]
+            if facility_slots and len(facility_slots) > 0:
+                standard_slots = list(facility_slots)
+            else:
+                standard_slots = [
+                    '08:00 - 08:30', '08:30 - 09:00', '09:00 - 09:30', '09:30 - 10:00',
+                    '10:00 - 10:30', '10:30 - 11:00', '11:00 - 11:30', '11:30 - 12:00',
+                    '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '15:30 - 16:00',
+                    '16:00 - 16:30', '16:30 - 17:00'
+                ]
 
         if not validated_data.get('experience_text') and validated_data.get('experience_years'):
             validated_data['experience_text'] = f"{validated_data['experience_years']} years"
             validated_data['experience_text_ar'] = f"{validated_data['experience_years']} سنوات"
+
+        if 'rating' not in validated_data:
+            validated_data['rating'] = 0.00
+        if 'review_count' not in validated_data:
+            validated_data['review_count'] = 0
+
+        # Create or link User account if username or password provided
+        user_login = (username or email or '').strip().lower()
+        if user_login:
+            from apps.accounts.models import User, UserRole
+            user_email = user_login if '@' in user_login else f"{user_login}@meetadr.ae"
+            matched_user = User.objects.filter(email__iexact=user_email).first()
+            if matched_user:
+                if matched_user.role != UserRole.DOCTOR:
+                    raise serializers.ValidationError({"username": "A user with this username/email already exists."})
+                if password:
+                    matched_user.set_password(password)
+                    matched_user.save()
+                validated_data['user'] = matched_user
+            else:
+                doctor_user = User.objects.create(
+                    email=user_email,
+                    name=validated_data.get('name', 'Doctor'),
+                    role=UserRole.DOCTOR,
+                    is_active=True,
+                )
+                if password:
+                    doctor_user.set_password(password)
+                    doctor_user.save()
+                validated_data['user'] = doctor_user
 
         doctor = super().create(validated_data)
 
