@@ -11,6 +11,9 @@ from apps.doctors.facility_views import (
     FacilityDoctorDetailView,
     FacilityDoctorStatusView,
 )
+from apps.importers.bulk_import_views import (
+    FacilityBulkImportDoctorsView,
+)
 
 urlpatterns = [
     # Facility operational settings
@@ -26,6 +29,7 @@ urlpatterns = [
 
     # Facility doctors roster management
     path('doctors/', FacilityDoctorListCreateView.as_view(), name='facility_doctors'),
+    path('doctors/import/', FacilityBulkImportDoctorsView.as_view(), name='facility_doctors_bulk_import'),
     path('doctors/<uuid:pk>/', FacilityDoctorDetailView.as_view(), name='facility_doctor_detail'),
     path('doctors/<uuid:pk>/status/', FacilityDoctorStatusView.as_view(), name='facility_doctor_status'),
 ]

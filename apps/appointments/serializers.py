@@ -130,6 +130,9 @@ class AppointmentCreateSerializer(serializers.Serializer):
     dependent_id = serializers.UUIDField(required=False, allow_null=True)
     notes = serializers.CharField(max_length=1000, required=False, allow_blank=True, default='')
     patient_phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
+    billing_type = serializers.CharField(max_length=32, required=False, default='self_pay')
+    insurance_provider = serializers.CharField(max_length=128, required=False, allow_blank=True, default='')
+    insurance_number = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
 
 class AppointmentCancelSerializer(serializers.Serializer):
     """Payload serializer for cancelling an appointment."""
@@ -189,6 +192,14 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
     isFacilityReviewed = serializers.SerializerMethodField()
     doctorReview = serializers.SerializerMethodField()
     facilityReview = serializers.SerializerMethodField()
+    billing_type = serializers.CharField(read_only=True)
+    billingType = serializers.CharField(source='billing_type', read_only=True)
+    insurance_provider_snapshot = serializers.CharField(read_only=True)
+    insuranceProvider = serializers.CharField(source='insurance_provider_snapshot', read_only=True)
+    insurance_number_snapshot = serializers.CharField(read_only=True)
+    insuranceNumber = serializers.CharField(source='insurance_number_snapshot', read_only=True)
+    insurance_network_status = serializers.CharField(read_only=True)
+    insuranceNetworkStatus = serializers.CharField(source='insurance_network_status', read_only=True)
 
     class Meta:
         model = Appointment
@@ -217,6 +228,14 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
             'facility_review',
             # Frontend camelCase aliases
             'patientId',
+            'billing_type',
+            'insurance_provider_snapshot',
+            'insurance_number_snapshot',
+            'insurance_network_status',
+            'billingType',
+            'insuranceProvider',
+            'insuranceNumber',
+            'insuranceNetworkStatus',
             'patientName',
             'patientPhone',
             'patientMobile',

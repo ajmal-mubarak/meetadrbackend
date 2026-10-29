@@ -30,6 +30,18 @@ class Hospital(models.Model):
     about_ar = models.TextField(blank=True)
     insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
     google_maps_url = models.URLField(max_length=500, blank=True, help_text='Google Maps location URL for the hospital')
+    country = models.CharField(max_length=128, default='UAE', blank=True)
+    emirate = models.CharField(max_length=128, blank=True)
+    area = models.CharField(max_length=128, blank=True)
+    latitude = models.DecimalField(max_digits=11, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=11, decimal_places=7, null=True, blank=True)
+    phone_dial_code = models.CharField(max_length=16, default='+971', blank=True)
+    website = models.URLField(max_length=500, blank=True)
+    logo = models.TextField(blank=True)
+    facility_category = models.CharField(max_length=32, default='Hospital', blank=True)
+    manager_name = models.CharField(max_length=128, blank=True)
+    manager_phone = models.CharField(max_length=32, blank=True)
+    manager_email = models.EmailField(blank=True)
     emergency_available = models.BooleanField(default=False)
     default_available_days = models.JSONField(
         default=list,
@@ -90,6 +102,18 @@ class Clinic(models.Model):
     about_ar = models.TextField(blank=True)
     insurance_plans = models.TextField(blank=True, help_text='Comma-separated list of accepted insurance providers')
     google_maps_url = models.URLField(max_length=500, blank=True, help_text='Google Maps location URL for the clinic')
+    country = models.CharField(max_length=128, default='UAE', blank=True)
+    emirate = models.CharField(max_length=128, blank=True)
+    area = models.CharField(max_length=128, blank=True)
+    latitude = models.DecimalField(max_digits=11, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=11, decimal_places=7, null=True, blank=True)
+    phone_dial_code = models.CharField(max_length=16, default='+971', blank=True)
+    website = models.URLField(max_length=500, blank=True)
+    logo = models.TextField(blank=True)
+    facility_category = models.CharField(max_length=32, default='Clinic', blank=True)
+    manager_name = models.CharField(max_length=128, blank=True)
+    manager_phone = models.CharField(max_length=32, blank=True)
+    manager_email = models.EmailField(blank=True)
     default_available_days = models.JSONField(
         default=list,
         blank=True,

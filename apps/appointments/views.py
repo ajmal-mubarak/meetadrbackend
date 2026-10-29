@@ -80,6 +80,11 @@ class AppointmentBookingView(views.APIView):
         dependent_id = data.get('dependent_id')
         notes = data.get('notes', '')
         input_phone = data.get('patient_phone', '').strip()
+        billing_type = data.get('billing_type', 'self_pay').strip().lower()
+        if billing_type not in ['insurance', 'self_pay']:
+            billing_type = 'self_pay'
+        insurance_provider = data.get('insurance_provider', '').strip()
+        insurance_number = data.get('insurance_number', '').strip()
 
         # 1. Validate Doctor & Facility Active Status
         doctor = Doctor.objects.select_related('hospital', 'clinic', 'schedule').filter(
@@ -187,6 +192,16 @@ class AppointmentBookingView(views.APIView):
             }, status=status.HTTP_409_CONFLICT)
 
         # 5. Authoritative Concurrency-Safe Database Insertion
+        # Check in-network status against the facility accepted insurance plans
+        if billing_type == 'insurance' and insurance_provider:
+            facility_plans = (getattr(facility, 'insurance_plans', '') or '').lower()
+            if insurance_provider.lower() in facility_plans:
+                network_status = 'in_network'
+            else:
+                network_status = 'out_of_network'
+        else:
+            network_status = 'self_pay'
+
         try:
             with transaction.atomic():
                 appointment = Appointment.objects.create(
@@ -200,6 +215,10 @@ class AppointmentBookingView(views.APIView):
                     patient_phone_snapshot=patient_phone_snapshot,
                     patient_email_snapshot=patient_email_snapshot,
                     specialty_snapshot=doctor.specialty,
+                    billing_type=billing_type,
+                    insurance_provider_snapshot=insurance_provider if billing_type == 'insurance' else '',
+                    insurance_number_snapshot=insurance_number if billing_type == 'insurance' else '',
+                    insurance_network_status=network_status,
                     date=target_date,
                     time_slot=time_slot,
                     status=AppointmentStatus.CONFIRMED,

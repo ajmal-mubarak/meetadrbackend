@@ -35,6 +35,8 @@ class HospitalListSerializer(serializers.ModelSerializer):
             'operating_hours_ar', 'about', 'about_ar',
             'emergency_available', 'google_maps_url', 'insurance_plans', 'status', 'doctor_count', 'specialties',
             'avg_rating', 'total_reviews',
+            'country', 'emirate', 'area', 'latitude', 'longitude', 'phone_dial_code',
+            'website', 'logo', 'facility_category', 'manager_name', 'manager_phone', 'manager_email',
         ]
 
     def get_doctor_count(self, obj):

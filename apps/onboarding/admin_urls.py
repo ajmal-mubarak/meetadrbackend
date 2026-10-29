@@ -25,6 +25,11 @@ from apps.appointments.admin_views import (
     AdminPatientListView,
     AdminPatientDetailView,
 )
+from apps.importers.bulk_import_views import (
+    AdminBulkImportDoctorsView,
+    AdminBulkImportHospitalsView,
+    DownloadTemplateView,
+)
 
 app_name = 'admin_onboarding'
 
@@ -46,6 +51,11 @@ urlpatterns = [
     path('doctors/bulk-action/', AdminDoctorBulkActionView.as_view(), name='admin_doctor_bulk_action'),
     path('doctors/<uuid:pk>/', AdminDoctorDetailView.as_view(), name='admin_doctor_detail'),
     path('doctors/<uuid:pk>/status/', AdminDoctorStatusView.as_view(), name='admin_doctor_status'),
+
+    # Excel / CSV Bulk Importers & Blank Templates: /api/v1/admin/import/
+    path('import/doctors/', AdminBulkImportDoctorsView.as_view(), name='admin_import_doctors'),
+    path('import/hospitals/', AdminBulkImportHospitalsView.as_view(), name='admin_import_hospitals'),
+    path('import/template/<str:target>/', DownloadTemplateView.as_view(), name='admin_import_template'),
 
     # Platform-wide patient management: /api/v1/admin/patients/
     path('patients/', AdminPatientListView.as_view(), name='admin_patient_list'),

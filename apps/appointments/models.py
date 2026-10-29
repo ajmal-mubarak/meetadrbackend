@@ -13,6 +13,15 @@ class AppointmentStatus(models.TextChoices):
     COMPLETED = 'completed', 'Completed'
     CANCELLED = 'cancelled', 'Cancelled'
 
+class BillingType(models.TextChoices):
+    INSURANCE = 'insurance', 'Health Insurance'
+    SELF_PAY = 'self_pay', 'Pay at Hospital (Self-Pay)'
+
+class InsuranceNetworkStatus(models.TextChoices):
+    IN_NETWORK = 'in_network', 'In-Network'
+    OUT_OF_NETWORK = 'out_of_network', 'Out-of-Network'
+    SELF_PAY = 'self_pay', 'Self-Pay'
+
 class Appointment(models.Model):
     """Consultation booking linking patient care with attending doctor and facility."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -66,6 +75,22 @@ class Appointment(models.Model):
     patient_phone_snapshot = models.CharField(max_length=32, blank=True)
     patient_email_snapshot = models.EmailField(blank=True)
     specialty_snapshot = models.CharField(max_length=128)
+    
+    # Billing & Insurance snapshot at time of booking (all payments settled at hospital)
+    billing_type = models.CharField(
+        max_length=32,
+        choices=BillingType.choices,
+        default=BillingType.SELF_PAY,
+        db_index=True
+    )
+    insurance_provider_snapshot = models.CharField(max_length=128, blank=True, default='')
+    insurance_number_snapshot = models.CharField(max_length=64, blank=True, default='')
+    insurance_network_status = models.CharField(
+        max_length=32,
+        choices=InsuranceNetworkStatus.choices,
+        default=InsuranceNetworkStatus.SELF_PAY,
+        db_index=True
+    )
     
     # Timing and slot scheduling
     date = models.DateField(db_index=True)

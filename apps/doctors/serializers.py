@@ -129,7 +129,9 @@ class DoctorListSerializer(serializers.ModelSerializer):
             'consultation_fee', 'status',
             'hospital_id', 'hospital_name', 'hospital_name_ar',
             'clinic_id', 'clinic_name',
-            'about', 'about_ar', 'education', 'available_days', 'available_slots'
+            'about', 'about_ar', 'education', 'available_days', 'available_slots',
+            'first_name', 'last_name', 'gender', 'department', 'qualifications',
+            'country_of_origin', 'languages', 'phone_dial_code', 'contact_number', 'email'
         ]
 
     def get_hospital_id(self, obj):
@@ -318,6 +320,7 @@ class AdminDoctorCreateSerializer(serializers.ModelSerializer):
             'nameAr',
             'photo',
             'specialty',
+            'special_interests',
             'location',
             'consultation_fee',
             'consultationFee',
@@ -337,6 +340,15 @@ class AdminDoctorCreateSerializer(serializers.ModelSerializer):
             'username',
             'password',
             'email',
+            'first_name',
+            'last_name',
+            'gender',
+            'department',
+            'qualifications',
+            'country_of_origin',
+            'languages',
+            'phone_dial_code',
+            'contact_number',
         ]
         read_only_fields = ['id']
 
@@ -389,6 +401,15 @@ class AdminDoctorCreateSerializer(serializers.ModelSerializer):
                     '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '15:30 - 16:00',
                     '16:00 - 16:30', '16:30 - 17:00'
                 ]
+
+        first_n = validated_data.get('first_name', '').strip()
+        last_n = validated_data.get('last_name', '').strip()
+        if (first_n or last_n) and not validated_data.get('name'):
+            validated_data['name'] = f"Dr. {first_n} {last_n}".strip()
+
+        quals = validated_data.get('qualifications')
+        if quals and not validated_data.get('education'):
+            validated_data['education'] = ', '.join(quals) if isinstance(quals, list) else str(quals)
 
         if not validated_data.get('experience_text') and validated_data.get('experience_years'):
             validated_data['experience_text'] = f"{validated_data['experience_years']} years"

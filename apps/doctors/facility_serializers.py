@@ -146,6 +146,15 @@ class FacilityDoctorSerializer(serializers.ModelSerializer):
         for forbidden in ['hospital', 'clinic', 'hospital_id', 'clinic_id', 'rating', 'review_count', 'status', 'user']:
             validated_data.pop(forbidden, None)
 
+        first_n = validated_data.get('first_name', '').strip()
+        last_n = validated_data.get('last_name', '').strip()
+        if (first_n or last_n) and not validated_data.get('name'):
+            validated_data['name'] = f"Dr. {first_n} {last_n}".strip()
+
+        quals = validated_data.get('qualifications')
+        if quals and not validated_data.get('education'):
+            validated_data['education'] = ', '.join(quals) if isinstance(quals, list) else str(quals)
+
         # Enforce server-side facility binding strictly
         if facility_type == 'hospital':
             validated_data['hospital'] = facility
