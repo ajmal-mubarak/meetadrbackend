@@ -385,6 +385,13 @@ class AdminBulkImportHospitalsView(views.APIView):
             about = rec.get('hospitalprofile', '').strip() or f"{h_name} is an accredited healthcare facility in {emirate}."
             photo = rec.get('hospitalimage', '').strip()
             logo = rec.get('hospitallogo', '').strip()
+            ins_raw = (
+                rec.get('insurance', '').strip()
+                or rec.get('insurances', '').strip()
+                or rec.get('acceptedinsurances', '').strip()
+                or rec.get('insuranceplans', '').strip()
+                or rec.get('acceptedinsurance', '').strip()
+            )
 
             mgr_name = rec.get('managername', '').strip()
             mgr_phone = rec.get('managerphone', '').strip()
@@ -421,6 +428,7 @@ class AdminBulkImportHospitalsView(views.APIView):
                         about=about,
                         photo=photo,
                         logo=logo,
+                        insurance_plans=ins_raw,
                         facility_category='Clinic',
                         manager_name=mgr_name,
                         manager_phone=mgr_phone,
@@ -444,6 +452,7 @@ class AdminBulkImportHospitalsView(views.APIView):
                         about=about,
                         photo=photo,
                         logo=logo,
+                        insurance_plans=ins_raw,
                         facility_category=cat_norm,
                         manager_name=mgr_name,
                         manager_phone=mgr_phone,
