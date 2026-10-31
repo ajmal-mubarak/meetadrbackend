@@ -145,80 +145,195 @@ class AdminProviderRequestStatusView(views.APIView):
 
         # State transition validations
         if new_status == 'approved':
-            if app.status == RequestStatus.APPROVED or app.hospital is not None or app.clinic is not None:
+            if app.status == RequestStatus.APPROVED or app.hospital is not None or app.clinic is not None or app.doctor is not None:
                 return Response({
                     "error": "ValidationError",
                     "code": "ALREADY_APPROVED",
                     "message": "This onboarding application has already been approved and provisioned."
                 }, status=status.HTTP_400_BAD_REQUEST)
 
+            facility_data = serializer.validated_data.get('facility_data')
+            doctor_data = serializer.validated_data.get('doctor_data')
+
             # Atomic provisioning pipeline
             with transaction.atomic():
                 admin_email = app.email.lower().strip()
+                if facility_data and facility_data.get('manager_email'):
+                    admin_email = facility_data.get('manager_email').lower().strip()
+                elif doctor_data and doctor_data.get('email'):
+                    admin_email = doctor_data.get('email').lower().strip()
+
                 target_role = UserRole.DOCTOR if app.provider_type == ProviderType.DOCTOR else UserRole.HOSPITAL
                 
-                # Verify no conflicting active user exists with a different role
-                existing_user = User.objects.filter(email=admin_email).first()
-                if existing_user and existing_user.role != target_role:
-                    return Response({
-                        "error": "ValidationError",
-                        "code": "USER_EMAIL_CONFLICT",
-                        "message": f"A user account with email '{admin_email}' already exists with role '{existing_user.role}'."
-                    }, status=status.HTTP_400_BAD_REQUEST)
+                # Direct credentials if provided
+                direct_username = None
+                direct_password = None
+                if facility_data:
+                    direct_username = facility_data.get('username')
+                    direct_password = facility_data.get('password')
+                elif doctor_data:
+                    direct_username = doctor_data.get('username')
+                    direct_password = doctor_data.get('password')
 
                 # 1. Create Facility or Doctor
                 facility = None
                 doctor = None
-                if app.provider_type == ProviderType.HOSPITAL:
+
+                if app.provider_type == ProviderType.HOSPITAL or (facility_data and facility_data.get('type') == 'hospital'):
+                    f_name = (facility_data.get('name') if facility_data else None) or app.name
+                    f_name_ar = (facility_data.get('name_ar') if facility_data else None) or app.name_ar
+                    f_loc = (facility_data.get('location') if facility_data else None) or app.location
+                    f_country = (facility_data.get('country') if facility_data else None) or app.country or 'United Arab Emirates'
+                    f_emirate = (facility_data.get('emirate') if facility_data else None) or f_loc
+                    f_area = (facility_data.get('area') if facility_data else None) or ''
+                    f_addr = (facility_data.get('address') if facility_data else None) or app.address or f_loc
+                    f_phone = (facility_data.get('phone') if facility_data else None) or app.contact_number
+                    f_dial = (facility_data.get('phone_dial_code') if facility_data else None) or '+971'
+                    f_hours = (facility_data.get('operating_hours') if facility_data else None) or "Open 24/7"
+                    f_about = (facility_data.get('about') if facility_data else None) or f"{f_name} is an accredited medical hospital affiliated with MeetAdr."
+                    f_emergency = facility_data.get('emergency_available', True) if facility_data else True
+                    f_maps = (facility_data.get('google_maps_url') if facility_data else None) or app.google_maps_url or ''
+                    f_website = (facility_data.get('website') if facility_data else None) or ''
+                    f_photo = (facility_data.get('photo') if facility_data else None) or ''
+                    f_logo = (facility_data.get('logo') if facility_data else None) or ''
+                    f_cat = (facility_data.get('facility_category') if facility_data else None) or 'Hospital'
+                    f_mgr_name = (facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name
+                    f_mgr_phone = (facility_data.get('manager_phone') if facility_data else None) or app.contact_number
+                    f_ins = facility_data.get('insurance_plans', '') if facility_data else ''
+                    if isinstance(f_ins, list):
+                        f_ins = ', '.join(f_ins)
+
                     facility = Hospital.objects.create(
-                        name=app.name,
-                        name_ar=app.name_ar,
-                        location=app.location,
-                        address=app.address or app.location,
-                        phone=app.contact_number,
-                        operating_hours="Mon - Sun: 08:00 - 20:00",
-                        about=f"{app.name} is an accredited medical hospital affiliated with MeetAdr.",
-                        emergency_available=True,
-                        google_maps_url=app.google_maps_url or '',
-                        status=FacilityStatus.DEACTIVATED
+                        name=f_name,
+                        name_ar=f_name_ar,
+                        location=f_loc,
+                        country=f_country,
+                        emirate=f_emirate,
+                        area=f_area,
+                        address=f_addr,
+                        phone=f_phone,
+                        phone_dial_code=f_dial,
+                        operating_hours=f_hours,
+                        about=f_about,
+                        emergency_available=f_emergency,
+                        google_maps_url=f_maps,
+                        website=f_website,
+                        photo=f_photo,
+                        logo=f_logo,
+                        facility_category=f_cat,
+                        manager_name=f_mgr_name,
+                        manager_phone=f_mgr_phone,
+                        manager_email=admin_email,
+                        insurance_plans=f_ins,
+                        status=FacilityStatus.ACTIVE if (direct_username and direct_password) else FacilityStatus.DEACTIVATED
                     )
                     app.hospital = facility
                     app.clinic = None
                     app.doctor = None
-                elif app.provider_type == ProviderType.CLINIC:
+
+                elif app.provider_type == ProviderType.CLINIC or (facility_data and facility_data.get('type') == 'clinic'):
+                    f_name = (facility_data.get('name') if facility_data else None) or app.name
+                    f_name_ar = (facility_data.get('name_ar') if facility_data else None) or app.name_ar
+                    f_loc = (facility_data.get('location') if facility_data else None) or app.location
+                    f_country = (facility_data.get('country') if facility_data else None) or app.country or 'United Arab Emirates'
+                    f_emirate = (facility_data.get('emirate') if facility_data else None) or f_loc
+                    f_area = (facility_data.get('area') if facility_data else None) or ''
+                    f_addr = (facility_data.get('address') if facility_data else None) or app.address or f_loc
+                    f_phone = (facility_data.get('phone') if facility_data else None) or app.contact_number
+                    f_dial = (facility_data.get('phone_dial_code') if facility_data else None) or '+971'
+                    f_hours = (facility_data.get('operating_hours') if facility_data else None) or "Mon - Sat: 08:00 - 20:00"
+                    f_spec = (facility_data.get('primary_specialty') if facility_data else None) or app.specialty or "General Medicine"
+                    f_about = (facility_data.get('about') if facility_data else None) or f"{f_name} is an accredited specialized outpatient clinic affiliated with MeetAdr."
+                    f_maps = (facility_data.get('google_maps_url') if facility_data else None) or app.google_maps_url or ''
+                    f_website = (facility_data.get('website') if facility_data else None) or ''
+                    f_photo = (facility_data.get('photo') if facility_data else None) or ''
+                    f_logo = (facility_data.get('logo') if facility_data else None) or ''
+                    f_cat = (facility_data.get('facility_category') if facility_data else None) or 'Clinic'
+                    f_mgr_name = (facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name
+                    f_mgr_phone = (facility_data.get('manager_phone') if facility_data else None) or app.contact_number
+                    f_ins = facility_data.get('insurance_plans', '') if facility_data else ''
+                    if isinstance(f_ins, list):
+                        f_ins = ', '.join(f_ins)
+
                     facility = Clinic.objects.create(
-                        name=app.name,
-                        name_ar=app.name_ar,
-                        location=app.location,
-                        address=app.address or app.location,
-                        primary_specialty=app.specialty or "General Medicine",
-                        phone=app.contact_number,
-                        operating_hours="Mon - Sat: 08:00 - 20:00",
-                        about=f"{app.name} is an accredited specialized outpatient clinic affiliated with MeetAdr.",
-                        google_maps_url=app.google_maps_url or '',
-                        status=FacilityStatus.DEACTIVATED
+                        name=f_name,
+                        name_ar=f_name_ar,
+                        location=f_loc,
+                        country=f_country,
+                        emirate=f_emirate,
+                        area=f_area,
+                        address=f_addr,
+                        primary_specialty=f_spec,
+                        phone=f_phone,
+                        phone_dial_code=f_dial,
+                        operating_hours=f_hours,
+                        about=f_about,
+                        google_maps_url=f_maps,
+                        website=f_website,
+                        photo=f_photo,
+                        logo=f_logo,
+                        facility_category=f_cat,
+                        manager_name=f_mgr_name,
+                        manager_phone=f_mgr_phone,
+                        manager_email=admin_email,
+                        insurance_plans=f_ins,
+                        status=FacilityStatus.ACTIVE if (direct_username and direct_password) else FacilityStatus.DEACTIVATED
                     )
                     app.clinic = facility
                     app.hospital = None
                     app.doctor = None
+
                 elif app.provider_type == ProviderType.DOCTOR:
+                    d_name = (doctor_data.get('name') if doctor_data else None) or app.name
+                    d_name_ar = (doctor_data.get('name_ar') if doctor_data else None) or app.name_ar
+                    d_first = (doctor_data.get('first_name') if doctor_data else None) or ''
+                    d_last = (doctor_data.get('last_name') if doctor_data else None) or ''
+                    d_gender = (doctor_data.get('gender') if doctor_data else None) or 'Male'
+                    d_dept = (doctor_data.get('department') if doctor_data else None) or app.specialty or ''
+                    d_spec = (doctor_data.get('specialty') if doctor_data else None) or app.specialty or "General Physician"
+                    d_loc = (doctor_data.get('location') if doctor_data else None) or app.location
+                    d_about = (doctor_data.get('about') if doctor_data else None) or f"Dr. {d_name} is an independent medical practitioner affiliated with MeetAdr."
+                    d_fee = doctor_data.get('consultation_fee', 100.00) if doctor_data else 100.00
+                    d_exp = doctor_data.get('experience_years', 5) if doctor_data else 5
+                    d_photo = (doctor_data.get('photo') if doctor_data else None) or ''
+                    d_edu = (doctor_data.get('education') if doctor_data else None) or ''
+                    d_quals = doctor_data.get('qualifications', []) if doctor_data else []
+                    d_langs = doctor_data.get('languages', ['English', 'Arabic']) if doctor_data else ['English', 'Arabic']
+                    d_interests = doctor_data.get('special_interests', []) if doctor_data else []
+
                     doctor = Doctor.objects.create(
-                        name=app.name,
-                        name_ar=app.name_ar,
-                        specialty=app.specialty or "General Physician",
-                        location=app.location,
-                        about=f"Dr. {app.name} is an independent medical practitioner affiliated with MeetAdr.",
-                        consultation_fee=100.00,
-                        experience_years=5,
+                        name=d_name,
+                        name_ar=d_name_ar,
+                        first_name=d_first,
+                        last_name=d_last,
+                        gender=d_gender,
+                        department=d_dept,
+                        specialty=d_spec,
+                        qualifications=d_quals,
+                        languages=d_langs,
+                        special_interests=d_interests,
+                        location=d_loc,
+                        about=d_about,
+                        education=d_edu,
+                        photo=d_photo,
+                        consultation_fee=d_fee,
+                        experience_years=d_exp,
                         status=FacilityStatus.ACTIVE,
                     )
+
+                    avail_days = doctor_data.get('available_days', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) if doctor_data else ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+                    std_slots = doctor_data.get('standard_slots', [
+                        '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30', '10:30 - 11:00',
+                        '11:00 - 11:30', '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '16:00 - 16:30'
+                    ]) if doctor_data else [
+                        '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30', '10:30 - 11:00',
+                        '11:00 - 11:30', '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '16:00 - 16:30'
+                    ]
+
                     DoctorSchedule.objects.create(
                         doctor=doctor,
-                        available_days=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-                        standard_slots=[
-                            '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30', '10:30 - 11:00',
-                            '11:00 - 11:30', '14:00 - 14:30', '14:30 - 15:00', '15:00 - 15:30', '16:00 - 16:30'
-                        ],
+                        available_days=avail_days,
+                        standard_slots=std_slots,
                         slot_duration_minutes=30
                     )
                     app.doctor = doctor
@@ -232,24 +347,62 @@ class AdminProviderRequestStatusView(views.APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
 
                 # 2. Provision Admin/Doctor User
-                if existing_user:
-                    user = existing_user
-                    user.name = app.contact_person or app.name
-                    user.phone = app.contact_number
-                    user.role = target_role
-                    user.is_active = False
-                    user.set_unusable_password()
-                    user.save()
+                # If direct credentials (username & password) are provided by admin in modal:
+                if direct_username and direct_password:
+                    existing_user = User.objects.filter(username=direct_username).first() or User.objects.filter(email=admin_email).first()
+                    if existing_user:
+                        user = existing_user
+                        user.username = direct_username
+                        user.name = (facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name
+                        user.phone = app.contact_number
+                        user.role = target_role
+                        user.is_active = True
+                        user.set_password(direct_password)
+                        user.save()
+                    else:
+                        user = User.objects.create_user(
+                            username=direct_username,
+                            email=admin_email,
+                            password=direct_password,
+                            role=target_role,
+                            first_name=(facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name,
+                            is_active=True
+                        )
                 else:
-                    user = User.objects.create(
-                        email=admin_email,
-                        name=app.contact_person or app.name,
-                        phone=app.contact_number,
-                        role=target_role,
-                        is_active=False
+                    # Legacy fallback for passwordless / setup-token link
+                    existing_user = User.objects.filter(email=admin_email).first()
+                    if existing_user:
+                        user = existing_user
+                        user.name = app.contact_person or app.name
+                        user.phone = app.contact_number
+                        user.role = target_role
+                        user.is_active = False
+                        user.set_unusable_password()
+                        user.save()
+                    else:
+                        user = User.objects.create(
+                            email=admin_email,
+                            name=app.contact_person or app.name,
+                            phone=app.contact_number,
+                            role=target_role,
+                            is_active=False
+                        )
+                        user.set_unusable_password()
+                        user.save()
+
+                    # Generate Single-Use Setup Token only for legacy fallback
+                    raw_token = secrets.token_urlsafe(48)
+                    token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+                    expires_at = timezone.now() + timedelta(hours=72)
+                    ProviderInvitationToken.objects.update_or_create(
+                        user=user,
+                        defaults={
+                            'token_hash': token_hash,
+                            'expires_at': expires_at,
+                            'is_used': False,
+                        }
                     )
-                    user.set_unusable_password()
-                    user.save()
+                    send_provider_invitation_email(user, doctor or facility, raw_token)
 
                 # 3. Associate User
                 if facility:
@@ -259,21 +412,7 @@ class AdminProviderRequestStatusView(views.APIView):
                     doctor.user = user
                     doctor.save(update_fields=['user'])
 
-                # 4. Generate Single-Use Cryptographic Setup Token
-                raw_token = secrets.token_urlsafe(48)
-                token_hash = hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
-                expires_at = timezone.now() + timedelta(hours=72)
-
-                invitation, _ = ProviderInvitationToken.objects.update_or_create(
-                    user=user,
-                    defaults={
-                        'token_hash': token_hash,
-                        'expires_at': expires_at,
-                        'is_used': False,
-                    }
-                )
-
-                # 5. Transition Application Status
+                # 4. Transition Application Status
                 app.status = RequestStatus.APPROVED
                 app.reviewed_by = request.user
                 app.reviewed_at = timezone.now()
@@ -281,7 +420,7 @@ class AdminProviderRequestStatusView(views.APIView):
                     app.admin_notes = admin_notes
                 app.save()
 
-                # 6. Audit Logging (Zero token or credential leakage)
+                # 5. Audit Logging
                 target_entity = doctor or facility
                 log_audit_event(
                     action="PROVIDER_APPLICATION_APPROVED",
@@ -293,37 +432,10 @@ class AdminProviderRequestStatusView(views.APIView):
                         "name": app.name,
                         "entity_id": str(target_entity.id),
                         "admin_email": user.email,
+                        "live_direct": bool(direct_username and direct_password)
                     },
                     request=request
                 )
-                log_audit_event(
-                    action="ENTITY_CREATED",
-                    target_model=target_entity.__class__.__name__,
-                    target_id=str(target_entity.id),
-                    actor=request.user,
-                    change_summary={
-                        "name": target_entity.name,
-                        "status": getattr(target_entity, 'status', 'active'),
-                        "user_id": str(user.id),
-                    },
-                    request=request
-                )
-                log_audit_event(
-                    action="INVITATION_CREATED",
-                    target_model="ProviderInvitationToken",
-                    target_id=str(invitation.id),
-                    actor=request.user,
-                    change_summary={
-                        "user_id": str(user.id),
-                        "user_email": user.email,
-                        "entity_id": str(target_entity.id),
-                        "expires_at": expires_at.isoformat(),
-                    },
-                    request=request
-                )
-
-                # 7. Dispatch Email
-                send_provider_invitation_email(user, target_entity, raw_token)
 
             return Response(AdminProviderRequestListSerializer(app).data, status=status.HTTP_200_OK)
 

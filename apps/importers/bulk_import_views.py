@@ -22,7 +22,7 @@ from apps.audit.utils import log_audit_event
 
 
 def parse_xlsx_cells(content_bytes):
-    """Zero-dependency parser for .xlsx XML cells."""
+    """Zero-dependency parser for .xlsx XML cells supporting multiple sheets and inlineStr."""
     with zipfile.ZipFile(io.BytesIO(content_bytes)) as z:
         shared_strings = []
         if 'xl/sharedStrings.xml' in z.namelist():
@@ -32,8 +32,34 @@ def parse_xlsx_cells(content_bytes):
                 for elem in sroot.findall('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}si')
             ]
 
-        sheet_name = 'xl/worksheets/sheet1.xml'
-        root = ET.fromstring(z.read(sheet_name))
+        sheet_path = None
+        if 'xl/workbook.xml' in z.namelist() and 'xl/_rels/workbook.xml.rels' in z.namelist():
+            wb_root = ET.fromstring(z.read('xl/workbook.xml'))
+            rels_root = ET.fromstring(z.read('xl/_rels/workbook.xml.rels'))
+            r_map = {
+                r.get('Id'): r.get('Target')
+                for r in rels_root.findall('{http://schemas.openxmlformats.org/package/2006/relationships}Relationship')
+            }
+            for s in wb_root.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet'):
+                s_name = s.get('name', '')
+                r_id = s.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
+                target = r_map.get(r_id, '')
+                full_path = 'xl/' + target if not target.startswith('xl/') else target
+                # Prefer 'Upload' sheet if present in official templates
+                if s_name.strip().lower() == 'upload' and full_path in z.namelist():
+                    sheet_path = full_path
+                    break
+
+        if not sheet_path:
+            for possible in ['xl/worksheets/sheet3.xml', 'xl/worksheets/sheet1.xml']:
+                if possible in z.namelist():
+                    sheet_path = possible
+                    break
+        if not sheet_path:
+            ws_candidates = [n for n in z.namelist() if n.startswith('xl/worksheets/sheet')]
+            sheet_path = ws_candidates[0] if ws_candidates else 'xl/worksheets/sheet1.xml'
+
+        root = ET.fromstring(z.read(sheet_path))
 
         rows = {}
         for c in root.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}c'):
@@ -50,11 +76,14 @@ def parse_xlsx_cells(content_bytes):
                 col_idx = col_idx * 26 + (ord(char) - ord('A') + 1)
             col_idx -= 1
             v = c.find('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v')
+            is_elem = c.find('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}is')
             t = c.get('t')
             val = ''
-            if v is not None and v.text is not None:
+            if is_elem is not None:
+                val = ''.join(is_elem.itertext())
+            elif v is not None and v.text is not None:
                 if t == 's':
-                    val = shared_strings[int(v.text)]
+                    val = shared_strings[int(v.text)] if int(v.text) < len(shared_strings) else ''
                 else:
                     val = v.text
             if row_idx not in rows:
@@ -98,8 +127,14 @@ def extract_records(matrix):
     first_col = [row[0] for row in clean_matrix if row]
     norm_first_col = [normalize_key(x) for x in first_col]
 
-    doctor_signals = {'hospitalname', 'firstname', 'lastname', 'speciality', 'department'}
-    hospital_signals = {'hospitalname', 'country', 'emiratesprovince', 'area'}
+    doctor_signals = {
+        'hospitalname', 'hospitalclinicaffiliation', 'firstname', 'lastname',
+        'speciality', 'specialty', 'department', 'displaytitlefullnameenglish'
+    }
+    hospital_signals = {
+        'hospitalname', 'facilityname', 'facilitynameenglish', 'country',
+        'emiratesprovince', 'emirate', 'area', 'facilitytype'
+    }
 
     is_transposed = len(set(norm_first_col) & (doctor_signals | hospital_signals)) >= 2
 
@@ -136,7 +171,11 @@ def extract_records(matrix):
         f_name = r.get('firstname', '').lower()
         if f_name in ['entry manual', 'manual', 'notes', 'example notes']:
             continue
-        h_name = r.get('hospitalname', '').lower()
+        h_name = (
+            r.get('hospitalname', '')
+            or r.get('facilitynameenglish', '')
+            or r.get('facilityname', '')
+        ).lower()
         if h_name in ['entry manual', 'manual', 'notes']:
             continue
         filtered.append(r)
@@ -187,23 +226,25 @@ class AdminBulkImportDoctorsView(views.APIView):
             if not first_name and not last_name:
                 continue
 
-            full_name = f"Dr. {first_name} {last_name}".strip()
+            full_name = rec.get('displaytitlefullnameenglish', '').strip() or f"Dr. {first_name} {last_name}".strip()
             if not full_name or full_name == 'Dr.':
                 full_name = rec.get('doctorfullname', '').strip() or 'Dr. Specialist'
 
-            hosp_name = rec.get('hospitalname', '').strip()
+            name_ar = rec.get('doctornamearabic', '').strip() or rec.get('namear', '').strip() or None
+
+            hosp_name = rec.get('hospitalclinicaffiliation', '').strip() or rec.get('hospitalname', '').strip()
             facility_hospital = None
             facility_clinic = None
 
-            if hosp_name:
-                h_lower = hosp_name.lower()
+            if hosp_name and not hosp_name.lower().startswith('independent'):
+                clean_hosp = hosp_name.split('(')[0].split('—')[0].split('-')[0].strip().lower()
                 for name_k, h in all_hospitals.items():
-                    if h_lower in name_k or name_k in h_lower:
+                    if clean_hosp in name_k or name_k in clean_hosp:
                         facility_hospital = h
                         break
                 if not facility_hospital:
                     for name_k, c in all_clinics.items():
-                        if h_lower in name_k or name_k in h_lower:
+                        if clean_hosp in name_k or name_k in clean_hosp:
                             facility_clinic = c
                             break
 
@@ -212,12 +253,16 @@ class AdminBulkImportDoctorsView(views.APIView):
             if gender not in ['Male', 'Female', 'Other']:
                 gender = 'Male'
 
-            quals_raw = rec.get('qualifications', '').strip()
+            quals_raw = rec.get('qualificationsdegrees', '').strip() or rec.get('qualifications', '').strip()
             qualifications = [q.strip() for q in quals_raw.split(',') if q.strip()]
 
-            specialty = rec.get('speciality', '').strip() or rec.get('specialty', '').strip() or 'General Medicine'
+            specialty = rec.get('specialty', '').strip() or rec.get('speciality', '').strip() or 'General Medicine'
 
-            interests_raw = rec.get('specialintrests', '').strip() or rec.get('specialinterests', '').strip()
+            interests_raw = (
+                rec.get('specialinterestsconditions', '').strip()
+                or rec.get('specialintrests', '').strip()
+                or rec.get('specialinterests', '').strip()
+            )
             special_interests = [s.strip() for s in interests_raw.split(',') if s.strip()]
 
             exp_raw = rec.get('yearsofexperience', '').strip()
@@ -232,18 +277,19 @@ class AdminBulkImportDoctorsView(views.APIView):
 
             country_origin = rec.get('countryoforigin', '').strip() or 'United Arab Emirates'
 
-            langs_raw = rec.get('languagespoken', '').strip() or rec.get('languages', '').strip()
+            langs_raw = rec.get('languagesspoken', '').strip() or rec.get('languagespoken', '').strip() or rec.get('languages', '').strip()
             languages = [l.strip() for l in langs_raw.split(',') if l.strip()] or ['English', 'Arabic']
 
-            dial_code = rec.get('clinicdialcode', '').strip() or rec.get('countrycodearea971uae', '').strip() or '+971'
+            dial_code = rec.get('countrydialcode', '').strip() or rec.get('clinicdialcode', '').strip() or rec.get('countrycodearea971uae', '').strip() or '+971'
             if not dial_code.startswith('+') or len(dial_code) > 16:
                 dial_code = '+971'
             contact_number = rec.get('contactnumber', '').strip()
-            email = rec.get('email', '').strip()
-            about = rec.get('doctorprofile', '').strip() or f"{full_name} is an accredited medical specialist."
-            photo = rec.get('doctorimagefilename', '').strip() or rec.get('photo', '').strip()
+            email = rec.get('doctoremail', '').strip() or rec.get('email', '').strip()
+            about = rec.get('doctorprofilebiography', '').strip() or rec.get('doctorprofile', '').strip() or f"{full_name} is an accredited medical specialist."
+            photo = rec.get('doctorphotofilename', '').strip() or rec.get('doctorimagefilename', '').strip() or rec.get('photo', '').strip()
+            location = rec.get('emiratelocation', '').strip() or rec.get('location', '').strip() or (facility_hospital.location if facility_hospital else (facility_clinic.location if facility_clinic else 'Dubai'))
 
-            username = rec.get('username', '').strip() or email or f"doc_{first_name.lower()}_{idx}"
+            username = rec.get('usernameemail', '').strip() or rec.get('username', '').strip() or email or f"doc_{first_name.lower()}_{idx}"
             password = rec.get('password', '').strip() or 'Doctor@12345'
 
             try:
@@ -262,6 +308,7 @@ class AdminBulkImportDoctorsView(views.APIView):
                 doc = Doctor.objects.create(
                     user=user,
                     name=full_name,
+                    name_ar=name_ar,
                     first_name=first_name,
                     last_name=last_name,
                     gender=gender,
@@ -279,7 +326,7 @@ class AdminBulkImportDoctorsView(views.APIView):
                     photo=photo,
                     hospital=facility_hospital,
                     clinic=facility_clinic,
-                    location=facility_hospital.location if facility_hospital else (facility_clinic.location if facility_clinic else 'Dubai'),
+                    location=location,
                     consultation_fee=Decimal('350.00'),
                     status=FacilityStatus.ACTIVE,
                 )
@@ -349,20 +396,39 @@ class AdminBulkImportHospitalsView(views.APIView):
         created_facilities = []
 
         for idx, rec in enumerate(records, 1):
-            h_name = rec.get('hospitalname', '').strip()
+            h_name = (
+                rec.get('facilitynameenglish', '').strip()
+                or rec.get('hospitalname', '').strip()
+                or rec.get('facilityname', '').strip()
+                or rec.get('name', '').strip()
+            )
             if not h_name:
                 continue
 
-            category_raw = rec.get('hospitalclinicwellness', '').strip() or 'Hospital'
+            name_ar = rec.get('facilitynamearabic', '').strip()
+            category_raw = (
+                rec.get('facilitytype', '').strip()
+                or rec.get('hospitalclinicwellness', '').strip()
+                or 'Hospital'
+            )
             cat_norm = category_raw.capitalize()
             if cat_norm not in ['Hospital', 'Clinic', 'Wellness']:
                 cat_norm = 'Hospital'
 
             is_clinic = cat_norm == 'Clinic'
             country = rec.get('country', '').strip() or 'United Arab Emirates'
-            emirate = rec.get('emiratesprovince', '').strip() or 'Dubai'
-            area = rec.get('area', '').strip()
-            address = rec.get('addressoforganization', '').strip() or f"{emirate}, UAE"
+            emirate = (
+                rec.get('emirateprovince', '').strip()
+                or rec.get('emiratesprovince', '').strip()
+                or rec.get('emirate', '').strip()
+                or 'Dubai'
+            )
+            area = rec.get('areasubdistrict', '').strip() or rec.get('area', '').strip()
+            address = (
+                rec.get('address', '').strip()
+                or rec.get('addressoforganization', '').strip()
+                or f"{emirate}, UAE"
+            )
 
             lat_val = rec.get('latitude', '').strip()
             lng_val = rec.get('longitude', '').strip()
@@ -379,26 +445,48 @@ class AdminBulkImportHospitalsView(views.APIView):
             except:
                 pass
 
-            dial_code = rec.get('countrydialcode', '').strip() or rec.get('countrycodearea971uae', '').strip() or '+971'
-            main_phone = rec.get('hospitalmainnumber', '').strip() or '+971 4 000 0000'
+            dial_code = (
+                rec.get('countrydialcode', '').strip()
+                or rec.get('countrycodearea971uae', '').strip()
+                or '+971'
+            )
+            if not dial_code.startswith('+'):
+                dial_code = f"+{dial_code}"
+
+            main_phone = (
+                rec.get('mainnumber', '').strip()
+                or rec.get('hospitalmainnumber', '').strip()
+                or rec.get('phone', '').strip()
+                or '+971 4 000 0000'
+            )
             website = rec.get('website', '').strip()
-            about = rec.get('hospitalprofile', '').strip() or f"{h_name} is an accredited healthcare facility in {emirate}."
-            photo = rec.get('hospitalimage', '').strip()
-            logo = rec.get('hospitallogo', '').strip()
+            about = (
+                rec.get('facilityprofile', '').strip()
+                or rec.get('hospitalprofile', '').strip()
+                or f"{h_name} is an accredited healthcare facility in {emirate}."
+            )
+            photo = rec.get('facilityimagefilename', '').strip() or rec.get('hospitalimage', '').strip()
+            logo = rec.get('facilitylogofilename', '').strip() or rec.get('hospitallogo', '').strip()
             ins_raw = (
-                rec.get('insurance', '').strip()
-                or rec.get('insurances', '').strip()
-                or rec.get('acceptedinsurances', '').strip()
-                or rec.get('insuranceplans', '').strip()
+                rec.get('acceptedinsurances', '').strip()
                 or rec.get('acceptedinsurance', '').strip()
+                or rec.get('insurance', '').strip()
+                or rec.get('insurances', '').strip()
+                or rec.get('insuranceplans', '').strip()
             )
 
             mgr_name = rec.get('managername', '').strip()
             mgr_phone = rec.get('managerphone', '').strip()
-            mgr_email = rec.get('mangeremail', '').strip() or rec.get('manageremail', '').strip()
+            mgr_email = rec.get('manageremail', '').strip() or rec.get('mangeremail', '').strip()
 
-            username = rec.get('username', '').strip() or mgr_email or f"fac_{normalize_key(h_name)[:12]}_{idx}"
-            password = rec.get('password', '').strip() or 'Facility@12345'
+            username = (
+                rec.get('adminusernameloginemailid', '').strip()
+                or rec.get('adminusername', '').strip()
+                or rec.get('username', '').strip()
+                or mgr_email
+                or f"fac_{normalize_key(h_name)[:12]}_{idx}"
+            )
+            password = rec.get('adminpassword', '').strip() or rec.get('password', '').strip() or 'Facility@12345'
 
             try:
                 user = None
@@ -525,26 +613,46 @@ class FacilityBulkImportDoctorsView(views.APIView):
         is_hosp = fac_type == 'hospital'
 
         for idx, rec in enumerate(records, 1):
+            full_title_raw = (
+                rec.get('displaytitlefullnameenglish', '').strip()
+                or rec.get('doctorfullname', '').strip()
+            )
             first_name = rec.get('firstname', '').strip()
             last_name = rec.get('lastname', '').strip()
-            if not first_name and not last_name:
+            name_ar = rec.get('doctornamearabic', '').strip()
+
+            if not full_title_raw and not first_name and not last_name:
                 continue
 
-            full_name = f"Dr. {first_name} {last_name}".strip()
-            if not full_name or full_name == 'Dr.':
-                full_name = rec.get('doctorfullname', '').strip() or 'Dr. Specialist'
+            if full_title_raw:
+                full_name = full_title_raw if full_title_raw.startswith('Dr.') else f"Dr. {full_title_raw}"
+                if not first_name:
+                    parts = full_title_raw.replace('Dr.', '').strip().split()
+                    first_name = parts[0] if parts else 'Doctor'
+                    last_name = " ".join(parts[1:]) if len(parts) > 1 else 'Specialist'
+            else:
+                full_name = f"Dr. {first_name} {last_name}".strip()
 
-            dept = rec.get('department', '').strip()
             gender = rec.get('gender', 'Male').strip().capitalize()
             if gender not in ['Male', 'Female', 'Other']:
                 gender = 'Male'
 
-            quals_raw = rec.get('qualifications', '').strip()
+            quals_raw = rec.get('qualificationsdegrees', '').strip() or rec.get('qualifications', '').strip()
             qualifications = [q.strip() for q in quals_raw.split(',') if q.strip()]
 
-            specialty = rec.get('speciality', '').strip() or rec.get('specialty', '').strip() or 'General Medicine'
+            specialty = (
+                rec.get('speciality', '').strip()
+                or rec.get('specialty', '').strip()
+                or rec.get('department', '').strip()
+                or 'General Medicine'
+            )
+            dept = rec.get('department', '').strip() or specialty
 
-            interests_raw = rec.get('specialintrests', '').strip() or rec.get('specialinterests', '').strip()
+            interests_raw = (
+                rec.get('specialinterestsconditions', '').strip()
+                or rec.get('specialintrests', '').strip()
+                or rec.get('specialinterests', '').strip()
+            )
             special_interests = [s.strip() for s in interests_raw.split(',') if s.strip()]
 
             exp_raw = rec.get('yearsofexperience', '').strip()
@@ -558,18 +666,35 @@ class FacilityBulkImportDoctorsView(views.APIView):
                         exp_num = 5
 
             country_origin = rec.get('countryoforigin', '').strip() or 'United Arab Emirates'
-            langs_raw = rec.get('languagespoken', '').strip() or rec.get('languages', '').strip()
+            langs_raw = (
+                rec.get('languagesspoken', '').strip()
+                or rec.get('languagespoken', '').strip()
+                or rec.get('languages', '').strip()
+            )
             languages = [l.strip() for l in langs_raw.split(',') if l.strip()] or ['English', 'Arabic']
 
-            dial_code = rec.get('clinicdialcode', '').strip() or rec.get('countrycodearea971uae', '').strip() or '+971'
+            dial_code = (
+                rec.get('countrydialcode', '').strip()
+                or rec.get('clinicdialcode', '').strip()
+                or rec.get('countrycodearea971uae', '').strip()
+                or '+971'
+            )
             if not dial_code.startswith('+') or len(dial_code) > 16:
                 dial_code = '+971'
             contact_number = rec.get('contactnumber', '').strip()
-            email = rec.get('email', '').strip()
-            about = rec.get('doctorprofile', '').strip() or f"{full_name} is an experienced specialist at {facility.name}."
-            photo = rec.get('doctorimagefilename', '').strip() or rec.get('photo', '').strip()
+            email = rec.get('doctoremail', '').strip() or rec.get('email', '').strip()
+            about = (
+                rec.get('doctorprofilebiography', '').strip()
+                or rec.get('doctorprofile', '').strip()
+                or f"{full_name} is an experienced specialist at {facility.name}."
+            )
+            photo = (
+                rec.get('doctorphotofilename', '').strip()
+                or rec.get('doctorimagefilename', '').strip()
+                or rec.get('photo', '').strip()
+            )
 
-            username = rec.get('username', '').strip() or email or f"doc_{first_name.lower()}_{idx}"
+            username = rec.get('usernameemail', '').strip() or rec.get('username', '').strip() or email or f"doc_{first_name.lower()}_{idx}"
             password = rec.get('password', '').strip() or 'Doctor@12345'
 
             try:
@@ -638,17 +763,42 @@ class DownloadTemplateView(views.APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, target):
-        base_dir = settings.BASE_DIR.parent
+        candidate_dirs = [settings.BASE_DIR, settings.BASE_DIR.parent]
+        file_path = None
+        fname = ''
+
         if target == 'doctors':
-            file_path = os.path.join(base_dir, 'Template - Doctors Data.xlsx')
-            fname = 'Template - Doctors Data.xlsx'
+            fname = 'Doctor Template.xlsx'
+            for d in candidate_dirs:
+                p = os.path.join(d, fname)
+                if os.path.exists(p):
+                    file_path = p
+                    break
+            if not file_path:
+                for d in candidate_dirs:
+                    p = os.path.join(d, 'Template - Doctors Data.xlsx')
+                    if os.path.exists(p):
+                        file_path = p
+                        fname = 'Template - Doctors Data.xlsx'
+                        break
         elif target in ['hospitals', 'hospital']:
-            file_path = os.path.join(base_dir, 'Template - HOSPTIAL Data.xlsx')
-            fname = 'Template - HOSPTIAL Data.xlsx'
+            fname = 'Hospital Template.xlsx'
+            for d in candidate_dirs:
+                p = os.path.join(d, fname)
+                if os.path.exists(p):
+                    file_path = p
+                    break
+            if not file_path:
+                for d in candidate_dirs:
+                    p = os.path.join(d, 'Template - HOSPTIAL Data.xlsx')
+                    if os.path.exists(p):
+                        file_path = p
+                        fname = 'Template - HOSPTIAL Data.xlsx'
+                        break
         else:
             raise ValidationError({'target': 'Invalid template target. Use "doctors" or "hospitals".'})
 
-        if not os.path.exists(file_path):
+        if not file_path or not os.path.exists(file_path):
             return Response({'error': 'Template file not found on server.'}, status=status.HTTP_404_NOT_FOUND)
 
         response = FileResponse(open(file_path, 'rb'), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

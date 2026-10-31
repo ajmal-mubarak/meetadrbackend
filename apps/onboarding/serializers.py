@@ -63,6 +63,40 @@ class ProviderRequestPublicCreateSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         return value.lower().strip()
 
+    def validate_contact_number(self, value):
+        import re
+        val = str(value or '').strip()
+        # Must only contain valid phone characters (+, digits, spaces, hyphens, parentheses)
+        if not re.match(r'^\+?[0-9\s\-().]{7,32}$', val):
+            raise serializers.ValidationError(
+                "Please enter a valid phone number containing only digits and standard telephone characters."
+            )
+        # Check digit count
+        digits = re.sub(r'\D', '', val)
+        if len(digits) < 7 or len(digits) > 15:
+            raise serializers.ValidationError(
+                "Phone number must contain between 7 and 15 digits."
+            )
+        return val
+
+    def validate_name(self, value):
+        val = str(value or '').strip()
+        if len(val) < 2:
+            raise serializers.ValidationError("Name must be at least 2 characters long.")
+        return val
+
+    def validate_contact_person(self, value):
+        val = str(value or '').strip()
+        if len(val) < 2:
+            raise serializers.ValidationError("Contact person name must be at least 2 characters long.")
+        return val
+
+    def validate_location(self, value):
+        val = str(value or '').strip()
+        if len(val) < 2:
+            raise serializers.ValidationError("Location / City must be at least 2 characters long.")
+        return val
+
     def create(self, validated_data):
         # Force status to PENDING regardless of client payload
         validated_data['status'] = RequestStatus.PENDING
@@ -145,6 +179,16 @@ class AdminProviderRequestStatusUpdateSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         default=''
+    )
+    facility_data = serializers.DictField(
+        required=False,
+        allow_null=True,
+        default=None
+    )
+    doctor_data = serializers.DictField(
+        required=False,
+        allow_null=True,
+        default=None
     )
 
 class ProviderRequestPublicStatusSerializer(serializers.ModelSerializer):
