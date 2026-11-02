@@ -212,8 +212,7 @@ class AdminBookingStatusUpdateView(views.APIView):
                 ])
                 notify_appointment_cancelled(appointment, cancelled_by_user=request.user, reason=reason)
             elif new_status == AppointmentStatus.COMPLETED:
-                appointment.completed_at = timezone.now()
-                appointment.save(update_fields=['status', 'completed_at', 'updated_at'])
+                appointment.save(update_fields=['status', 'updated_at'])
                 notify_appointment_completed(appointment)
             else:
                 appointment.save(update_fields=['status', 'updated_at'])
