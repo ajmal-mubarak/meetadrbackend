@@ -146,3 +146,13 @@ class AdminProviderCreateSerializer(serializers.Serializer):
     manager_email = serializers.EmailField(required=False, allow_blank=True)
     username = serializers.CharField(max_length=150, required=False, allow_blank=True)
     password = serializers.CharField(max_length=128, required=False, allow_blank=True)
+
+    def validate_latitude(self, value):
+        if value is not None and (value < -90 or value > 90):
+            raise serializers.ValidationError("Latitude must be between -90 and 90 degrees.")
+        return value
+
+    def validate_longitude(self, value):
+        if value is not None and (value < -180 or value > 180):
+            raise serializers.ValidationError("Longitude must be between -180 and 180 degrees.")
+        return value

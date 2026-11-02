@@ -349,23 +349,36 @@ class AdminProviderRequestStatusView(views.APIView):
                 # 2. Provision Admin/Doctor User
                 # If direct credentials (username & password) are provided by admin in modal:
                 if direct_username and direct_password:
-                    existing_user = User.objects.filter(username=direct_username).first() or User.objects.filter(email=admin_email).first()
+                    target_email = direct_username.strip().lower() if '@' in direct_username else (admin_email or f"{direct_username.strip().lower()}@meetadr.local")
+                    existing_user = User.objects.filter(email=target_email).first()
                     if existing_user:
-                        user = existing_user
-                        user.username = direct_username
-                        user.name = (facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name
-                        user.phone = app.contact_number
-                        user.role = target_role
-                        user.is_active = True
-                        user.set_password(direct_password)
-                        user.save()
+                        if (target_role == UserRole.HOSPITAL and (hasattr(existing_user, 'hospital_facility') or hasattr(existing_user, 'clinic_facility'))) or \
+                           (target_role == UserRole.DOCTOR and hasattr(existing_user, 'doctor_profile')):
+                            unique_suffix = uuid.uuid4().hex[:6]
+                            target_email = f"{direct_username.split('@')[0]}_{unique_suffix}@meetadr.local"
+                            user = User.objects.create_user(
+                                email=target_email,
+                                password=direct_password,
+                                role=target_role,
+                                name=(facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name,
+                                phone=app.contact_number or '',
+                                is_active=True
+                            )
+                        else:
+                            user = existing_user
+                            user.name = (facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name
+                            user.phone = app.contact_number or ''
+                            user.role = target_role
+                            user.is_active = True
+                            user.set_password(direct_password)
+                            user.save()
                     else:
                         user = User.objects.create_user(
-                            username=direct_username,
-                            email=admin_email,
+                            email=target_email,
                             password=direct_password,
                             role=target_role,
-                            first_name=(facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name,
+                            name=(facility_data.get('manager_name') if facility_data else None) or app.contact_person or app.name,
+                            phone=app.contact_number or '',
                             is_active=True
                         )
                 else:

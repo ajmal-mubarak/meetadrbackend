@@ -1,3 +1,4 @@
+import uuid
 """Views for facility-scoped administrative management and platform-wide provider oversight."""
 
 from django.db import transaction
@@ -774,32 +775,43 @@ class AdminProviderListView(views.APIView):
 
 
 
-        # Create admin user if username & password provided
-
+                # Create or link admin user if username & password provided
         user = None
-
-        u_name = data.get('username')
-
-        pwd = data.get('password')
-
+        u_name = (data.get('username') or '').strip()
+        pwd = (data.get('password') or '').strip()
         if u_name and pwd:
-
             from apps.accounts.models import User, UserRole
-
-            if not User.objects.filter(username=u_name).exists():
-
+            target_email = u_name.lower() if '@' in u_name else (manager_email.lower().strip() if manager_email else f"{u_name.lower()}@hospital.meetadr.local")
+            existing_user = User.objects.filter(email=target_email).first()
+            if existing_user:
+                if hasattr(existing_user, 'hospital_facility') or hasattr(existing_user, 'clinic_facility'):
+                    unique_suffix = uuid.uuid4().hex[:6]
+                    target_email = f"{u_name.split('@')[0]}_{unique_suffix}@hospital.meetadr.local"
+                    user = User.objects.create_user(
+                        email=target_email,
+                        password=pwd,
+                        name=manager_name or name,
+                        phone=manager_phone or phone or '',
+                        role=UserRole.HOSPITAL,
+                        is_active=True,
+                    )
+                else:
+                    user = existing_user
+                    user.name = manager_name or name
+                    if manager_phone:
+                        user.phone = manager_phone
+                    user.role = UserRole.HOSPITAL
+                    user.is_active = True
+                    user.set_password(pwd)
+                    user.save()
+            else:
                 user = User.objects.create_user(
-
-                    username=u_name,
-
-                    email=manager_email or f"{u_name}@meetadr.local",
-
+                    email=target_email,
                     password=pwd,
-
+                    name=manager_name or name,
+                    phone=manager_phone or phone or '',
                     role=UserRole.HOSPITAL,
-
-                    first_name=manager_name or name,
-
+                    is_active=True,
                 )
 
 
