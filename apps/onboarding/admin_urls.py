@@ -21,6 +21,7 @@ from apps.doctors.admin_views import (
 from apps.appointments.admin_views import (
     AdminBookingListView,
     AdminBookingCancelView,
+    AdminBookingStatusUpdateView,
     AdminReportsView,
     AdminPatientListView,
     AdminPatientDetailView,
@@ -64,6 +65,8 @@ urlpatterns = [
     # Platform-wide global bookings oversight & cancellation: /api/v1/admin/bookings/
     path('bookings/', AdminBookingListView.as_view(), name='admin_booking_list'),
     path('bookings/<uuid:pk>/cancel/', AdminBookingCancelView.as_view(), name='admin_booking_cancel'),
+    path('bookings/<uuid:pk>/status/', AdminBookingStatusUpdateView.as_view(), name='admin_booking_status'),
+    path('bookings/<uuid:pk>/complete/', AdminBookingStatusUpdateView.as_view(), {'status': 'completed'}, name='admin_booking_complete'),
 
     # Platform-wide analytical & operational reporting: /api/v1/admin/reports/
     path('reports/', AdminReportsView.as_view(), name='admin_reports'),

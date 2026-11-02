@@ -20,7 +20,7 @@ from apps.appointments.serializers import (
     AppointmentDetailSerializer,
     AppointmentCancelSerializer,
 )
-from apps.notifications.services import notify_appointment_cancelled
+from apps.notifications.services import notify_appointment_cancelled, notify_appointment_completed
 from apps.audit.utils import log_audit_event
 
 
@@ -154,6 +154,80 @@ class AdminBookingCancelView(views.APIView):
                 "reason": reason,
                 "cancelled_by_role": UserRole.ADMIN,
                 "doctor_name": appointment.doctor.name,
+                "date": str(appointment.date),
+                "time_slot": appointment.time_slot,
+            },
+            request=request
+        )
+
+        return Response(AppointmentDetailSerializer(appointment).data, status=status.HTTP_200_OK)
+
+
+class AdminBookingStatusUpdateView(views.APIView):
+    """
+    Platform administrator endpoint to change booking status (completed, confirmed, cancelled).
+    PATCH /api/v1/admin/bookings/{id}/status/
+    POST  /api/v1/admin/bookings/{id}/status/
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def patch(self, request, pk, **kwargs):
+        return self._handle_update(request, pk, **kwargs)
+
+    def post(self, request, pk, **kwargs):
+        return self._handle_update(request, pk, **kwargs)
+
+    def _handle_update(self, request, pk, **kwargs):
+        try:
+            valid_uuid = uuid.UUID(str(pk))
+        except (ValueError, TypeError):
+            raise NotFound("Appointment not found.")
+
+        appointment = Appointment.objects.select_related(
+            'doctor', 'hospital', 'clinic', 'booked_by'
+        ).filter(id=valid_uuid).first()
+
+        if not appointment:
+            raise NotFound("Appointment not found.")
+
+        new_status = (request.data.get('status') or kwargs.get('status') or '').lower()
+        if new_status not in [AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED]:
+            return Response({
+                "error": "ValidationError",
+                "code": "INVALID_STATUS",
+                "message": f"Invalid status '{new_status}'. Allowed statuses: confirmed, completed, cancelled."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            previous_status = appointment.status
+            appointment.status = new_status
+            if new_status == AppointmentStatus.CANCELLED:
+                reason = request.data.get('reason', 'Cancelled by administrator')
+                appointment.cancel_reason = reason
+                appointment.cancelled_by_role = UserRole.ADMIN
+                appointment.cancelled_by_user = request.user
+                appointment.cancelled_at = timezone.now()
+                appointment.save(update_fields=[
+                    'status', 'cancel_reason', 'cancelled_by_role', 'cancelled_by_user', 'cancelled_at', 'updated_at'
+                ])
+                notify_appointment_cancelled(appointment, cancelled_by_user=request.user, reason=reason)
+            elif new_status == AppointmentStatus.COMPLETED:
+                appointment.completed_at = timezone.now()
+                appointment.save(update_fields=['status', 'completed_at', 'updated_at'])
+                notify_appointment_completed(appointment)
+            else:
+                appointment.save(update_fields=['status', 'updated_at'])
+
+        log_audit_event(
+            action=f"ADMIN_APPOINTMENT_{new_status.upper()}",
+            target_model="Appointment",
+            target_id=str(appointment.id),
+            actor=request.user,
+            change_summary={
+                "previous_status": previous_status,
+                "new_status": new_status,
+                "updated_by_role": UserRole.ADMIN,
+                "doctor_name": appointment.doctor.name if appointment.doctor else '',
                 "date": str(appointment.date),
                 "time_slot": appointment.time_slot,
             },
