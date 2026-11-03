@@ -229,6 +229,7 @@ class AdminBulkImportDoctorsView(views.APIView):
             full_name = rec.get('displaytitlefullnameenglish', '').strip() or f"Dr. {first_name} {last_name}".strip()
             if not full_name or full_name == 'Dr.':
                 full_name = rec.get('doctorfullname', '').strip() or 'Dr. Specialist'
+            full_name = re.sub(r'^(Dr\.\s*)+', 'Dr. ', full_name, flags=re.IGNORECASE).strip()
 
             name_ar = rec.get('doctornamearabic', '').strip() or rec.get('namear', '').strip() or None
 
@@ -626,6 +627,7 @@ class FacilityBulkImportDoctorsView(views.APIView):
 
             if full_title_raw:
                 full_name = full_title_raw if full_title_raw.startswith('Dr.') else f"Dr. {full_title_raw}"
+                full_name = re.sub(r'^(Dr\.\s*)+', 'Dr. ', full_name, flags=re.IGNORECASE).strip()
                 if not first_name:
                     parts = full_title_raw.replace('Dr.', '').strip().split()
                     first_name = parts[0] if parts else 'Doctor'
