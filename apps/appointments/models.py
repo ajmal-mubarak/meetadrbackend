@@ -98,7 +98,7 @@ class Appointment(models.Model):
     status = models.CharField(
         max_length=16,
         choices=AppointmentStatus.choices,
-        default=AppointmentStatus.CONFIRMED,
+        default=AppointmentStatus.PENDING,
         db_index=True
     )
     notes = models.TextField(blank=True)

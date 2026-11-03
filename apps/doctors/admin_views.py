@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
+from apps.accounts.models import UserRole
 from apps.accounts.permissions import IsPlatformAdmin
 from apps.doctors.models import Doctor
 from apps.doctors.serializers import (
@@ -250,6 +251,11 @@ class AdminDoctorDetailView(views.APIView):
         return Response(AdminDoctorListSerializer(doctor).data, status=status.HTTP_200_OK)
 
     def delete(self, request, pk):
+        if getattr(request.user, 'role', None) == UserRole.SUBADMIN:
+            return Response(
+                {"error": "Operations sub-administrators do not have permission to delete doctor profiles."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         from django.db import transaction
         doctor = self._get_doctor(pk)
         doc_name = doctor.name
@@ -321,6 +327,11 @@ class AdminDoctorBulkActionView(views.APIView):
             return Response({"message": f"Successfully deactivated {count} doctors.", "count": count})
 
         elif action == 'delete':
+            if getattr(request.user, 'role', None) == UserRole.SUBADMIN:
+                return Response(
+                    {"error": "Operations sub-administrators do not have permission to delete doctor profiles."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             with transaction.atomic():
                 for doc in doctors:
                     if hasattr(doc, 'appointments'):

@@ -221,7 +221,7 @@ class AppointmentBookingView(views.APIView):
                     insurance_network_status=network_status,
                     date=target_date,
                     time_slot=time_slot,
-                    status=AppointmentStatus.CONFIRMED,
+                    status=AppointmentStatus.PENDING,
                     notes=notes
                 )
                 notify_appointment_booked(appointment)

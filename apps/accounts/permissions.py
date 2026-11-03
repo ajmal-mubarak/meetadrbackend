@@ -59,14 +59,26 @@ class IsFacilityAdmin(permissions.BasePermission):
         return facility.status == FacilityStatus.ACTIVE
 
 class IsPlatformAdmin(permissions.BasePermission):
-    """Allows access only to platform superadministrators or staff."""
+    """Allows access to platform superadministrators, operations sub-administrators, or staff."""
+    def has_permission(self, request, view):
+        return bool(
+            request.user and
+            request.user.is_authenticated and
+            (
+                request.user.role in (UserRole.ADMIN, UserRole.SUBADMIN) or
+                request.user.is_staff or
+                request.user.is_superuser
+            )
+        )
+
+class IsSuperAdminOnly(permissions.BasePermission):
+    """Restricts system deletion and provider contract management to Superadmin only."""
     def has_permission(self, request, view):
         return bool(
             request.user and
             request.user.is_authenticated and
             (
                 request.user.role == UserRole.ADMIN or
-                request.user.is_staff or
                 request.user.is_superuser
             )
         )

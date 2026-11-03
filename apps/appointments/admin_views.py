@@ -20,7 +20,7 @@ from apps.appointments.serializers import (
     AppointmentDetailSerializer,
     AppointmentCancelSerializer,
 )
-from apps.notifications.services import notify_appointment_cancelled, notify_appointment_completed
+from apps.notifications.services import notify_appointment_cancelled, notify_appointment_completed, notify_appointment_confirmed
 from apps.audit.utils import log_audit_event
 
 
@@ -214,6 +214,9 @@ class AdminBookingStatusUpdateView(views.APIView):
             elif new_status == AppointmentStatus.COMPLETED:
                 appointment.save(update_fields=['status', 'updated_at'])
                 notify_appointment_completed(appointment)
+            elif new_status == AppointmentStatus.CONFIRMED:
+                appointment.save(update_fields=['status', 'updated_at'])
+                notify_appointment_confirmed(appointment)
             else:
                 appointment.save(update_fields=['status', 'updated_at'])
 

@@ -1301,6 +1301,11 @@ class AdminProviderDetailView(views.APIView):
 
 
     def delete(self, request, pk):
+        if getattr(request.user, 'role', None) == UserRole.SUBADMIN:
+            return Response(
+                {"error": "Operations sub-administrators do not have permission to delete healthcare facilities."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         facility = Hospital.objects.filter(id=pk).first() or Clinic.objects.filter(id=pk).first()
 

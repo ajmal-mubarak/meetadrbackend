@@ -319,21 +319,109 @@ def notify_appointment_booked(appointment):
     send_booking_notification_email_to_admins(appointment)
 
 
+def send_booking_confirmed_email_to_patient(appointment) -> bool:
+    """
+    Sends the booking confirmation email to the patient:
+    Your appointment with Dr. [Last Name] at [Facility] on [Date & Time] is confirmed.
+
+    Regards
+    Team MeetAdr.com
+    """
+    patient_email = getattr(appointment, 'patient_email_snapshot', None)
+    if not patient_email and appointment.booked_by:
+        patient_email = getattr(appointment.booked_by, 'email', None)
+
+    if not patient_email:
+        logger.info(f"No patient email found for appointment {appointment.id}, skipping confirmation email.")
+        return False
+
+    doc_last_name = _format_doctor_last_name(appointment.doctor)
+    doc_full_name = _format_doctor_name(appointment.doctor)
+    facility = appointment.hospital or appointment.clinic
+    facility_name = facility.name if facility else "the medical facility"
+
+    try:
+        if hasattr(appointment.date, 'strftime'):
+            formatted_date = appointment.date.strftime('%B %d, %Y')
+        else:
+            from datetime import datetime
+            parsed_date = datetime.strptime(str(appointment.date), '%Y-%m-%d')
+            formatted_date = parsed_date.strftime('%B %d, %Y')
+    except Exception:
+        formatted_date = str(appointment.date)
+
+    time_slot = appointment.time_slot or 'Standard Slot'
+    date_time_str = f"{formatted_date}, {time_slot}"
+    subject = f"Booking Confirmed: Dr. {doc_last_name} at {facility_name} | MeetAdr"
+
+    plain_message = (
+        f"Your booking request for Dr. {doc_last_name} at {facility_name} has been confirmed for {date_time_str}.\n\n"
+        "Regards\n"
+        "Team MeetAdr.com\n"
+    )
+
+    html_message = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Booking Confirmed</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b;">
+      <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e2ebf0; border-radius: 16px; padding: 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+        <div style="border-bottom: 2px solid #2da7b5; padding-bottom: 16px; margin-bottom: 24px;">
+          <h2 style="margin: 0; color: #0e7490; font-size: 20px; font-weight: 800;">MeetAdr.com</h2>
+        </div>
+        <div style="display: inline-block; padding: 4px 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 9999px; color: #065f46; font-size: 12px; font-weight: 700; margin-bottom: 16px;">
+          ✓ Booking Confirmed
+        </div>
+        <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 20px;">
+          Your booking request for <strong>Dr. {doc_last_name}</strong> at <strong>{facility_name}</strong> has been <strong>confirmed</strong> for <strong>{date_time_str}</strong>.
+        </p>
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2ebf0; font-size: 14px; color: #64748b;">
+          <p style="margin: 0; font-weight: 600; color: #334155;">Regards</p>
+          <p style="margin: 4px 0 0 0; font-weight: 700; color: #0e7490;">Team MeetAdr.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@meetadr.com')
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=from_email,
+            recipient_list=[patient_email.lower().strip()],
+            html_message=html_message,
+            fail_silently=False
+        )
+        logger.info(f"Dispatched booking confirmation email to {patient_email} for appointment {appointment.id}")
+        return True
+    except Exception as exc:
+        logger.warning(f"Failed to dispatch booking confirmation email: {exc}")
+        return False
+
+
 def notify_appointment_confirmed(appointment):
     """
-    Notifies the patient when their appointment is confirmed by the doctor or clinic.
+    Notifies the patient via in-app notification and email when their appointment is confirmed by administrator.
     """
     patient_user = appointment.booked_by
     doc_name = _format_doctor_name(appointment.doctor)
+    doc_last_name = _format_doctor_last_name(appointment.doctor)
     facility = appointment.hospital or appointment.clinic
     facility_name = facility.name if facility else "the medical facility"
     create_notification(
         user=patient_user,
-        title="Appointment Confirmed",
-        description=f"Your appointment with {doc_name} at {facility_name} for {appointment.date} at {appointment.time_slot} has been confirmed.",
+        title="Booking Confirmed",
+        description=f"Your booking request for Dr. {doc_last_name} at {facility_name} has been confirmed for {appointment.date} at {appointment.time_slot}.",
         notification_type=NotificationType.APPOINTMENT,
         link="/patient/bookings"
     )
+    # Dispatch confirmation email to patient
+    send_booking_confirmed_email_to_patient(appointment)
 
 
 def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: str = ""):

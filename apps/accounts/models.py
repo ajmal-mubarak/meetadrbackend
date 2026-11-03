@@ -9,6 +9,7 @@ class UserRole(models.TextChoices):
     DOCTOR = 'doctor', 'Doctor'
     HOSPITAL = 'hospital', 'Hospital/Clinic Administrator'
     ADMIN = 'admin', 'Platform Superadministrator'
+    SUBADMIN = 'subadmin', 'Platform Operations Sub-Administrator'
 
 class BloodGroup(models.TextChoices):
     A_POS = 'A+', 'A+'
