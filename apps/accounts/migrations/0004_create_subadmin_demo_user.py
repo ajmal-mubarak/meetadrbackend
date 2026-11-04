@@ -27,3 +27,4 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(create_subadmin_user, remove_subadmin_user),
     ]
+
