@@ -43,8 +43,8 @@ def parse_xlsx_cells(content_bytes):
             for s in wb_root.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet'):
                 s_name = s.get('name', '')
                 r_id = s.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
-                target = r_map.get(r_id, '')
-                full_path = 'xl/' + target if not target.startswith('xl/') else target
+                target = r_map.get(r_id, '').lstrip('/')
+                full_path = target if target.startswith('xl/') else 'xl/' + target
                 # Prefer 'Upload' sheet if present in official templates
                 if s_name.strip().lower() == 'upload' and full_path in z.namelist():
                     sheet_path = full_path
