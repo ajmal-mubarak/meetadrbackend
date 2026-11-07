@@ -6,6 +6,7 @@ import csv
 import zipfile
 import xml.etree.ElementTree as ET
 from decimal import Decimal
+from django.db.models import Q
 from django.conf import settings
 from django.http import HttpResponse, FileResponse
 from rest_framework import views, status, permissions
@@ -219,6 +220,7 @@ class AdminBulkImportDoctorsView(views.APIView):
             return Response({'error': f'Batch size exceeds maximum limit of 500 records (found {len(records)}). Please split your file into smaller batches.'}, status=status.HTTP_400_BAD_REQUEST)
 
         created_count = 0
+        skipped_count = 0
         errors = []
         created_doctors = []
 
@@ -305,9 +307,37 @@ class AdminBulkImportDoctorsView(views.APIView):
             password = rec.get('password', '').strip() or 'Doctor@12345'
 
             try:
+                user_email = email or (username if '@' in username else f"{username}@meetadr.local")
+
+                # De-duplication check: avoid creating duplicate doctors
+                dup_doc = None
+                if user_email and '@' in user_email and not user_email.endswith('@meetadr.local'):
+                    dup_doc = Doctor.objects.filter(Q(email__iexact=user_email) | Q(user__email__iexact=user_email)).first()
+
+                if not dup_doc:
+                    q_dup = Doctor.objects.filter(name__iexact=full_name, specialty__iexact=specialty)
+                    if facility_hospital:
+                        q_dup = q_dup.filter(hospital=facility_hospital)
+                    elif facility_clinic:
+                        q_dup = q_dup.filter(clinic=facility_clinic)
+                    dup_doc = q_dup.first()
+
+                if not dup_doc and contact_number and len(contact_number) >= 7:
+                    dup_doc = Doctor.objects.filter(contact_number=contact_number).first()
+
+                if dup_doc:
+                    skipped_count += 1
+                    fac_info = dup_doc.hospital.name if dup_doc.hospital else (dup_doc.clinic.name if dup_doc.clinic else 'Independent')
+                    errors.append({
+                        'record': idx,
+                        'name': full_name,
+                        'error': f"Doctor '{full_name}' ({specialty}) already exists at {fac_info}.",
+                        'skipped': True
+                    })
+                    continue
+
                 # User account
                 user = None
-                user_email = email or (username if '@' in username else f"{username}@meetadr.local")
                 if user_email:
                     if not User.objects.filter(email=user_email).exists():
                         user = User.objects.create_user(
@@ -316,6 +346,8 @@ class AdminBulkImportDoctorsView(views.APIView):
                             role=UserRole.DOCTOR,
                             name=full_name,
                         )
+                    else:
+                        user = User.objects.filter(email=user_email).first()
 
                 doc = Doctor.objects.create(
                     user=user,
@@ -353,7 +385,14 @@ class AdminBulkImportDoctorsView(views.APIView):
                 created_count += 1
                 created_doctors.append({'id': str(doc.id), 'name': doc.name, 'specialty': doc.specialty})
             except Exception as e:
-                errors.append({'record': idx, 'name': full_name, 'error': str(e)})
+                raw_err = str(e).strip()
+                if 'character varying' in raw_err or 'value too long' in raw_err:
+                    clean_err = f"One of the text fields for doctor '{full_name}' exceeds maximum allowed length."
+                elif 'unique constraint' in raw_err or 'duplicate key' in raw_err:
+                    clean_err = f"A doctor account with email '{user_email or full_name}' already exists in the system."
+                else:
+                    clean_err = raw_err
+                errors.append({'record': idx, 'name': full_name, 'error': clean_err, 'skipped': False})
 
         log_audit_event(
             action="BULK_IMPORT_DOCTORS",
@@ -364,15 +403,27 @@ class AdminBulkImportDoctorsView(views.APIView):
             request=request
         )
 
-        first_err = errors[0]['error'] if errors else 'Import failed.'
+        status_code = status.HTTP_201_CREATED if created_count > 0 else (status.HTTP_200_OK if skipped_count > 0 else status.HTTP_400_BAD_REQUEST)
+        if created_count > 0 and skipped_count > 0:
+            summary_msg = f"Import completed: {created_count} doctor(s) imported, {skipped_count} existing record(s) skipped."
+        elif created_count > 0:
+            summary_msg = f"Successfully imported {created_count} doctor(s) into the database."
+        elif skipped_count > 0:
+            summary_msg = f"All {skipped_count} doctor(s) in this file already exist in the database (skipped to prevent duplicates)."
+        else:
+            real_errs = [e['error'] for e in errors if not e.get('skipped')]
+            summary_msg = f"Import failed: {real_errs[0]}" if real_errs else "No doctor records could be imported."
+
         return Response({
-            'success': created_count > 0,
+            'success': created_count > 0 or skipped_count > 0,
             'total_records': len(records),
             'imported': created_count,
+            'skipped': skipped_count,
             'errors': errors,
             'doctors': created_doctors,
-            'error': f"Failed to import records: {first_err.strip()}" if created_count == 0 else None,
-        }, status=status.HTTP_201_CREATED if created_count > 0 else status.HTTP_400_BAD_REQUEST)
+            'message': summary_msg,
+            'error': summary_msg if created_count == 0 and skipped_count == 0 else None,
+        }, status=status_code)
 
 
 class AdminBulkImportHospitalsView(views.APIView):
@@ -412,6 +463,7 @@ class AdminBulkImportHospitalsView(views.APIView):
             return Response({'error': f'Batch size exceeds maximum limit of 500 records (found {len(records)}). Please split your file into smaller batches.'}, status=status.HTTP_400_BAD_REQUEST)
 
         created_count = 0
+        skipped_count = 0
         errors = []
         created_facilities = []
 
@@ -514,8 +566,27 @@ class AdminBulkImportHospitalsView(views.APIView):
             password = rec.get('adminpassword', '').strip() or rec.get('password', '').strip() or 'Facility@12345'
 
             try:
-                user = None
                 user_email = mgr_email or (username if '@' in username else f"{username}@meetadr.local")
+
+                # De-duplication check: avoid creating duplicate hospitals/clinics
+                dup_fac = Hospital.objects.filter(name__iexact=h_name).first() or Clinic.objects.filter(name__iexact=h_name).first()
+                if not dup_fac and user_email and '@' in user_email and not user_email.endswith('@meetadr.local'):
+                    dup_fac = Hospital.objects.filter(Q(manager_email__iexact=user_email) | Q(admin_user__email__iexact=user_email)).first() or                               Clinic.objects.filter(Q(manager_email__iexact=user_email) | Q(admin_user__email__iexact=user_email)).first()
+
+                if not dup_fac and main_phone and len(main_phone) >= 7 and main_phone != '+971 4 000 0000':
+                    dup_fac = Hospital.objects.filter(phone=main_phone).first() or Clinic.objects.filter(phone=main_phone).first()
+
+                if dup_fac:
+                    skipped_count += 1
+                    errors.append({
+                        'record': idx,
+                        'name': h_name,
+                        'error': f"Facility '{h_name}' ({dup_fac.emirate or 'UAE'}) already exists in the system.",
+                        'skipped': True
+                    })
+                    continue
+
+                user = None
                 if user_email:
                     if not User.objects.filter(email=user_email).exists():
                         user = User.objects.create_user(
@@ -524,6 +595,8 @@ class AdminBulkImportHospitalsView(views.APIView):
                             role=UserRole.HOSPITAL,
                             name=mgr_name or h_name,
                         )
+                    else:
+                        user = User.objects.filter(email=user_email).first()
 
                 if is_clinic:
                     fac = Clinic.objects.create(
@@ -580,7 +653,14 @@ class AdminBulkImportHospitalsView(views.APIView):
                 created_count += 1
                 created_facilities.append({'id': str(fac.id), 'name': fac.name, 'type': 'clinic' if is_clinic else 'hospital'})
             except Exception as e:
-                errors.append({'record': idx, 'name': h_name, 'error': str(e)})
+                raw_err = str(e).strip()
+                if 'character varying' in raw_err or 'value too long' in raw_err:
+                    clean_err = f"One of the text fields for '{h_name}' exceeds maximum allowed length."
+                elif 'unique constraint' in raw_err or 'duplicate key' in raw_err:
+                    clean_err = f"A facility with name or email '{h_name}' already exists in the system."
+                else:
+                    clean_err = raw_err
+                errors.append({'record': idx, 'name': h_name, 'error': clean_err, 'skipped': False})
 
         log_audit_event(
             action="BULK_IMPORT_HOSPITALS",
@@ -591,15 +671,27 @@ class AdminBulkImportHospitalsView(views.APIView):
             request=request
         )
 
-        first_err = errors[0]['error'] if errors else 'Import failed.'
+        status_code = status.HTTP_201_CREATED if created_count > 0 else (status.HTTP_200_OK if skipped_count > 0 else status.HTTP_400_BAD_REQUEST)
+        if created_count > 0 and skipped_count > 0:
+            summary_msg = f"Import completed: {created_count} facility/facilities imported, {skipped_count} existing record(s) skipped."
+        elif created_count > 0:
+            summary_msg = f"Successfully imported {created_count} facility/facilities into the database."
+        elif skipped_count > 0:
+            summary_msg = f"All {skipped_count} facility/facilities in this file already exist in the database (skipped to prevent duplicates)."
+        else:
+            real_errs = [e['error'] for e in errors if not e.get('skipped')]
+            summary_msg = f"Import failed: {real_errs[0]}" if real_errs else "No facility records could be imported."
+
         return Response({
-            'success': created_count > 0,
+            'success': created_count > 0 or skipped_count > 0,
             'total_records': len(records),
             'imported': created_count,
+            'skipped': skipped_count,
             'errors': errors,
             'facilities': created_facilities,
-            'error': f"Failed to import records: {first_err.strip()}" if created_count == 0 else None,
-        }, status=status.HTTP_201_CREATED if created_count > 0 else status.HTTP_400_BAD_REQUEST)
+            'message': summary_msg,
+            'error': summary_msg if created_count == 0 and skipped_count == 0 else None,
+        }, status=status_code)
 
 
 class FacilityBulkImportDoctorsView(views.APIView):
@@ -643,6 +735,7 @@ class FacilityBulkImportDoctorsView(views.APIView):
             return Response({'error': f'Batch size exceeds maximum limit of 500 records (found {len(records)}). Please split your file into smaller batches.'}, status=status.HTTP_400_BAD_REQUEST)
 
         created_count = 0
+        skipped_count = 0
         errors = []
         created_doctors = []
 
@@ -735,8 +828,35 @@ class FacilityBulkImportDoctorsView(views.APIView):
             password = rec.get('password', '').strip() or 'Doctor@12345'
 
             try:
-                user = None
                 user_email = email or (username if '@' in username else f"{username}@meetadr.local")
+
+                # De-duplication check: avoid creating duplicate doctors in facility
+                dup_doc = None
+                if user_email and '@' in user_email and not user_email.endswith('@meetadr.local'):
+                    dup_doc = Doctor.objects.filter(Q(email__iexact=user_email) | Q(user__email__iexact=user_email)).first()
+
+                if not dup_doc:
+                    q_dup = Doctor.objects.filter(name__iexact=full_name, specialty__iexact=specialty)
+                    if is_hosp:
+                        q_dup = q_dup.filter(hospital=facility)
+                    else:
+                        q_dup = q_dup.filter(clinic=facility)
+                    dup_doc = q_dup.first()
+
+                if not dup_doc and contact_number and len(contact_number) >= 7:
+                    dup_doc = Doctor.objects.filter(contact_number=contact_number).first()
+
+                if dup_doc:
+                    skipped_count += 1
+                    errors.append({
+                        'record': idx,
+                        'name': full_name,
+                        'error': f"Doctor '{full_name}' ({specialty}) already exists at {facility.name}.",
+                        'skipped': True
+                    })
+                    continue
+
+                user = None
                 if user_email:
                     if not User.objects.filter(email=user_email).exists():
                         user = User.objects.create_user(
@@ -745,6 +865,8 @@ class FacilityBulkImportDoctorsView(views.APIView):
                             role=UserRole.DOCTOR,
                             name=full_name,
                         )
+                    else:
+                        user = User.objects.filter(email=user_email).first()
 
                 doc = Doctor.objects.create(
                     user=user,
@@ -780,15 +902,36 @@ class FacilityBulkImportDoctorsView(views.APIView):
                 created_count += 1
                 created_doctors.append({'id': str(doc.id), 'name': doc.name, 'specialty': doc.specialty})
             except Exception as e:
-                errors.append({'record': idx, 'name': full_name, 'error': str(e)})
+                raw_err = str(e).strip()
+                if 'character varying' in raw_err or 'value too long' in raw_err:
+                    clean_err = f"One of the text fields for doctor '{full_name}' exceeds maximum allowed length."
+                elif 'unique constraint' in raw_err or 'duplicate key' in raw_err:
+                    clean_err = f"A doctor account with email '{user_email or full_name}' already exists in the system."
+                else:
+                    clean_err = raw_err
+                errors.append({'record': idx, 'name': full_name, 'error': clean_err, 'skipped': False})
+
+        status_code = status.HTTP_201_CREATED if created_count > 0 else (status.HTTP_200_OK if skipped_count > 0 else status.HTTP_400_BAD_REQUEST)
+        if created_count > 0 and skipped_count > 0:
+            summary_msg = f"Import completed: {created_count} doctor(s) imported, {skipped_count} existing record(s) skipped."
+        elif created_count > 0:
+            summary_msg = f"Successfully imported {created_count} doctor(s) into {facility.name}."
+        elif skipped_count > 0:
+            summary_msg = f"All {skipped_count} doctor(s) in this file already exist in {facility.name} (skipped to prevent duplicates)."
+        else:
+            real_errs = [e['error'] for e in errors if not e.get('skipped')]
+            summary_msg = f"Import failed: {real_errs[0]}" if real_errs else "No doctor records could be imported."
 
         return Response({
-            'success': True,
+            'success': created_count > 0 or skipped_count > 0,
             'total_records': len(records),
             'imported': created_count,
+            'skipped': skipped_count,
             'errors': errors,
             'doctors': created_doctors,
-        }, status=status.HTTP_201_CREATED if created_count > 0 else status.HTTP_400_BAD_REQUEST)
+            'message': summary_msg,
+            'error': summary_msg if created_count == 0 and skipped_count == 0 else None,
+        }, status=status_code)
 
 
 class DownloadTemplateView(views.APIView):
