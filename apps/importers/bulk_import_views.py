@@ -208,9 +208,15 @@ class AdminBulkImportDoctorsView(views.APIView):
         except Exception as e:
             return Response({'error': f'Failed to parse file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if uploaded_file.size > 25 * 1024 * 1024:
+            raise ValidationError({'file': 'File size exceeds maximum limit of 25 MB.'})
+
         records = extract_records(matrix)
         if not records:
             return Response({'error': 'No data records found in file.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(records) > 500:
+            return Response({'error': f'Batch size exceeds maximum limit of 500 records (found {len(records)}). Please split your file into smaller batches.'}, status=status.HTTP_400_BAD_REQUEST)
 
         created_count = 0
         errors = []
@@ -395,9 +401,15 @@ class AdminBulkImportHospitalsView(views.APIView):
         except Exception as e:
             return Response({'error': f'Failed to parse file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if uploaded_file.size > 25 * 1024 * 1024:
+            raise ValidationError({'file': 'File size exceeds maximum limit of 25 MB.'})
+
         records = extract_records(matrix)
         if not records:
             return Response({'error': 'No data records found in file.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(records) > 500:
+            return Response({'error': f'Batch size exceeds maximum limit of 500 records (found {len(records)}). Please split your file into smaller batches.'}, status=status.HTTP_400_BAD_REQUEST)
 
         created_count = 0
         errors = []
@@ -620,9 +632,15 @@ class FacilityBulkImportDoctorsView(views.APIView):
         except Exception as e:
             return Response({'error': f'Failed to parse file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if uploaded_file.size > 25 * 1024 * 1024:
+            raise ValidationError({'file': 'File size exceeds maximum limit of 25 MB.'})
+
         records = extract_records(matrix)
         if not records:
             return Response({'error': 'No data records found in file.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(records) > 500:
+            return Response({'error': f'Batch size exceeds maximum limit of 500 records (found {len(records)}). Please split your file into smaller batches.'}, status=status.HTTP_400_BAD_REQUEST)
 
         created_count = 0
         errors = []
