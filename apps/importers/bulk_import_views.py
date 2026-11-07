@@ -281,9 +281,14 @@ class AdminBulkImportDoctorsView(views.APIView):
             langs_raw = rec.get('languagesspoken', '').strip() or rec.get('languagespoken', '').strip() or rec.get('languages', '').strip()
             languages = [l.strip() for l in langs_raw.split(',') if l.strip()] or ['English', 'Arabic']
 
-            dial_code = rec.get('countrydialcode', '').strip() or rec.get('clinicdialcode', '').strip() or rec.get('countrycodearea971uae', '').strip() or '+971'
-            if not dial_code.startswith('+') or len(dial_code) > 16:
-                dial_code = '+971'
+            raw_doc_dial = rec.get('countrydialcode', '').strip() or rec.get('clinicdialcode', '').strip() or rec.get('countrycodearea971uae', '').strip() or '+971'
+            m_doc_code = re.search(r'(\+\d+)', raw_doc_dial)
+            if m_doc_code:
+                dial_code = m_doc_code.group(1)[:16]
+            elif raw_doc_dial.startswith('+'):
+                dial_code = raw_doc_dial[:16]
+            else:
+                dial_code = f"+{raw_doc_dial}"[:16]
             contact_number = rec.get('contactnumber', '').strip()
             email = rec.get('doctoremail', '').strip() or rec.get('email', '').strip()
             about = rec.get('doctorprofilebiography', '').strip() or rec.get('doctorprofile', '').strip() or f"{full_name} is an accredited medical specialist."
@@ -353,12 +358,14 @@ class AdminBulkImportDoctorsView(views.APIView):
             request=request
         )
 
+        first_err = errors[0]['error'] if errors else 'Import failed.'
         return Response({
-            'success': True,
+            'success': created_count > 0,
             'total_records': len(records),
             'imported': created_count,
             'errors': errors,
             'doctors': created_doctors,
+            'error': f"Failed to import records: {first_err.strip()}" if created_count == 0 else None,
         }, status=status.HTTP_201_CREATED if created_count > 0 else status.HTTP_400_BAD_REQUEST)
 
 
@@ -446,13 +453,18 @@ class AdminBulkImportHospitalsView(views.APIView):
             except:
                 pass
 
-            dial_code = (
+            raw_dial = (
                 rec.get('countrydialcode', '').strip()
                 or rec.get('countrycodearea971uae', '').strip()
                 or '+971'
             )
-            if not dial_code.startswith('+'):
-                dial_code = f"+{dial_code}"
+            m_code = re.search(r'(\+\d+)', raw_dial)
+            if m_code:
+                dial_code = m_code.group(1)[:16]
+            elif raw_dial.startswith('+'):
+                dial_code = raw_dial[:16]
+            else:
+                dial_code = f"+{raw_dial}"[:16]
 
             main_phone = (
                 rec.get('mainnumber', '').strip()
@@ -513,6 +525,8 @@ class AdminBulkImportHospitalsView(views.APIView):
                         longitude=lng,
                         phone_dial_code=dial_code,
                         phone=main_phone,
+                        operating_hours=rec.get('operatinghours', '').strip() or '08:00 - 21:00',
+                        primary_specialty=rec.get('primaryspecialty', '').strip() or 'General Medicine',
                         website=website,
                         about=about,
                         photo=photo,
@@ -537,6 +551,7 @@ class AdminBulkImportHospitalsView(views.APIView):
                         longitude=lng,
                         phone_dial_code=dial_code,
                         phone=main_phone,
+                        operating_hours=rec.get('operatinghours', '').strip() or '24/7',
                         website=website,
                         about=about,
                         photo=photo,
@@ -564,12 +579,14 @@ class AdminBulkImportHospitalsView(views.APIView):
             request=request
         )
 
+        first_err = errors[0]['error'] if errors else 'Import failed.'
         return Response({
-            'success': True,
+            'success': created_count > 0,
             'total_records': len(records),
             'imported': created_count,
             'errors': errors,
             'facilities': created_facilities,
+            'error': f"Failed to import records: {first_err.strip()}" if created_count == 0 else None,
         }, status=status.HTTP_201_CREATED if created_count > 0 else status.HTTP_400_BAD_REQUEST)
 
 
