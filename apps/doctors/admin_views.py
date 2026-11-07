@@ -19,9 +19,9 @@ from apps.audit.utils import log_audit_event
 
 class AdminDoctorPagination(PageNumberPagination):
     """Platform administrator doctor directory pagination."""
-    page_size = 20
+    page_size = 200
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 500
 
 
 class AdminDoctorListView(generics.ListCreateAPIView):
@@ -87,7 +87,7 @@ class AdminDoctorListView(generics.ListCreateAPIView):
                 pass
             queryset = queryset.filter(filter_q)
 
-        return queryset.order_by('name')
+        return queryset.order_by('-created_at', 'name')
 
 
 class AdminDoctorStatusView(views.APIView):
