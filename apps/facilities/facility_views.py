@@ -703,9 +703,7 @@ class AdminProviderListView(views.APIView):
 
                 })
 
-
-
-        results.sort(key=lambda x: str(x['name']))
+        results.sort(key=lambda x: str(x.get('created_at') or ''), reverse=True)
 
         return Response(results, status=status.HTTP_200_OK)
 
