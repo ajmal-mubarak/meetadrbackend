@@ -45,6 +45,9 @@ REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = (
 AUTH_COOKIE_SECURE = False
 AUTH_COOKIE_SAMESITE = 'Lax'
 
+# Allow local dev ports (5173, 5174, 5175, 3000, etc.)
+CORS_ALLOW_ALL_ORIGINS = True
+
 # ── Email: print to console in local dev ─────────────────────────────────────
 # Invitation emails will appear in the Django runserver terminal output.
 # Copy the setup link from there to give to the hospital administrator.

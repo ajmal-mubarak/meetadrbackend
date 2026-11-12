@@ -26,6 +26,11 @@ from apps.appointments.admin_views import (
     AdminPatientListView,
     AdminPatientDetailView,
 )
+from apps.importers.photo_views import (
+    AdminPhotoListView,
+    AdminPhotoUploadView,
+    AdminPhotoDeleteView,
+)
 from apps.importers.bulk_import_views import (
     AdminBulkImportDoctorsView,
     AdminBulkImportHospitalsView,
@@ -52,6 +57,11 @@ urlpatterns = [
     path('doctors/bulk-action/', AdminDoctorBulkActionView.as_view(), name='admin_doctor_bulk_action'),
     path('doctors/<uuid:pk>/', AdminDoctorDetailView.as_view(), name='admin_doctor_detail'),
     path('doctors/<uuid:pk>/status/', AdminDoctorStatusView.as_view(), name='admin_doctor_status'),
+
+    # Cloud Photo & Media Management: /api/v1/admin/photos/
+    path('photos/', AdminPhotoListView.as_view(), name='admin_photos_list'),
+    path('photos/upload/', AdminPhotoUploadView.as_view(), name='admin_photos_upload'),
+    path('photos/delete/', AdminPhotoDeleteView.as_view(), name='admin_photos_delete'),
 
     # Excel / CSV Bulk Importers & Blank Templates: /api/v1/admin/import/
     path('import/doctors/', AdminBulkImportDoctorsView.as_view(), name='admin_import_doctors'),

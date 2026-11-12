@@ -220,7 +220,7 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         'CORS_ALLOWED_ORIGINS',
-        'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173'
+        'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175'
     ).split(',')
     if origin.strip()
 ]
@@ -266,3 +266,8 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 # Upload size limits (supports Excel imports, high-res photos, and logos)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024  # 25 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024  # 25 MB
+
+# Supabase Storage Configuration (Direct Public Cloud Integration)
+SUPABASE_STORAGE_URL = os.getenv('SUPABASE_STORAGE_URL', 'https://kpdichfdhrkcdivqebow.supabase.co')
+SUPABASE_STORAGE_KEY = os.getenv('SUPABASE_STORAGE_KEY', '')
+SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', 'photos')
