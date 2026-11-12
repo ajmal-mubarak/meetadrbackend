@@ -146,16 +146,19 @@ def list_photos(category: str = 'doctors', limit: int = 100, offset: int = 0) ->
 
     return results
 
-def delete_photo(path: str) -> bool:
+def delete_photos(paths: list) -> bool:
     """
-    Delete a photo by path (e.g. 'doctors/dr_ahmed.jpg').
+    Delete one or multiple photos by path (e.g. ['doctors/dr_ahmed.jpg', ...]).
+    Supabase Storage API: DELETE /storage/v1/object/{bucket} with body {"prefixes": [...]}
     """
     project_url, secret_key, bucket = get_storage_config()
-    if not secret_key:
+    if not secret_key or not paths:
         return False
 
     del_url = f"{project_url}/storage/v1/object/{bucket}"
-    payload = {'prefixes': [path]}
+    payload = {'prefixes': [p for p in paths if isinstance(p, str) and p.strip()]}
+    if not payload['prefixes']:
+        return False
 
     req = urllib.request.Request(
         del_url,
@@ -173,4 +176,11 @@ def delete_photo(path: str) -> bool:
             return resp.status == 200
     except Exception:
         return False
+
+def delete_photo(path: str) -> bool:
+    """
+    Delete a single photo by path (e.g. 'doctors/dr_ahmed.jpg').
+    """
+    return delete_photos([path])
+
 

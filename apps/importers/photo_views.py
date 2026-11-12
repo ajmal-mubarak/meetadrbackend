@@ -6,7 +6,7 @@ from rest_framework import views, status, permissions
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from apps.accounts.permissions import IsPlatformAdmin
-from apps.importers.storage_service import upload_photo, list_photos, delete_photo
+from apps.importers.storage_service import upload_photo, list_photos, delete_photo, delete_photos
 
 class AdminPhotoListView(views.APIView):
     """
@@ -94,20 +94,39 @@ class AdminPhotoUploadView(views.APIView):
 
 class AdminPhotoDeleteView(views.APIView):
     """
-    Delete a photo from Supabase Storage.
+    Delete single or multiple photos from Supabase Storage.
     DELETE /api/v1/admin/photos/delete/
-    Payload: {"path": "doctors/filename.jpg"}
+    Payload options:
+      {"path": "doctors/filename.jpg"}
+      {"paths": ["doctors/f1.jpg", "doctors/f2.jpg"]}
+    Also supports query params ?path=... or ?paths=... to handle proxies/CDNs that omit DELETE body.
     """
     permission_classes = [IsPlatformAdmin]
 
     def delete(self, request):
-        path = request.data.get('path')
-        if not path:
+        data = request.data if isinstance(request.data, dict) else {}
+        raw_paths = data.get('paths') or request.query_params.getlist('paths')
+        single_path = data.get('path') or request.query_params.get('path')
+
+        target_paths = []
+        if raw_paths:
+            if isinstance(raw_paths, list):
+                target_paths.extend([str(p).strip() for p in raw_paths if str(p).strip()])
+            elif isinstance(raw_paths, str):
+                target_paths.extend([p.strip() for p in raw_paths.split(',') if p.strip()])
+        elif single_path:
+            target_paths.append(str(single_path).strip())
+
+        if not target_paths:
             return Response({'error': 'Photo path is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        success = delete_photo(path)
+        success = delete_photos(target_paths)
         if success:
-            return Response({'success': True, 'message': 'Photo deleted successfully.'}, status=status.HTTP_200_OK)
+            return Response({
+                'success': True,
+                'deleted_count': len(target_paths),
+                'message': f"{len(target_paths)} photo(s) deleted successfully."
+            }, status=status.HTTP_200_OK)
         else:
-            return Response({'error': 'Failed to delete photo.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': 'Failed to delete photo(s) from storage.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
