@@ -8,7 +8,7 @@ from rest_framework.pagination import PageNumberPagination
 
 from apps.accounts.models import UserRole
 from apps.accounts.permissions import IsPlatformAdmin
-from apps.doctors.models import Doctor
+from apps.doctors.models import Doctor, DoctorSchedule
 from apps.doctors.serializers import (
     AdminDoctorListSerializer,
     AdminDoctorCreateSerializer,
@@ -19,7 +19,7 @@ from apps.audit.utils import log_audit_event
 
 class AdminDoctorPagination(PageNumberPagination):
     """Platform administrator doctor directory pagination."""
-    page_size = 200
+    page_size = 100
     page_size_query_param = 'page_size'
     max_page_size = 500
 
@@ -69,6 +69,21 @@ class AdminDoctorListView(generics.ListCreateAPIView):
         status_param = self.request.query_params.get('status')
         if status_param and status_param.lower() != 'all':
             queryset = queryset.filter(status__iexact=status_param.strip())
+
+        specialty_param = self.request.query_params.get('specialty')
+        if specialty_param and specialty_param.lower() != 'all':
+            queryset = queryset.filter(specialty__iexact=specialty_param.strip())
+
+        facility_param = self.request.query_params.get('facility') or self.request.query_params.get('facility_id')
+        if facility_param and facility_param.lower() != 'all':
+            if facility_param.lower() == 'independent':
+                queryset = queryset.filter(hospital__isnull=True, clinic__isnull=True)
+            else:
+                try:
+                    fac_uuid = uuid.UUID(facility_param)
+                    queryset = queryset.filter(Q(hospital_id=fac_uuid) | Q(clinic_id=fac_uuid))
+                except (ValueError, TypeError):
+                    queryset = queryset.filter(Q(hospital__name__iexact=facility_param) | Q(clinic__name__iexact=facility_param))
 
         search = self.request.query_params.get('search')
         if search:
@@ -231,7 +246,7 @@ class AdminDoctorDetailView(views.APIView):
         available_days = data.get('availableDays') or data.get('available_days')
         standard_slots = data.get('standardSlots') or data.get('standard_slots')
         if available_days or standard_slots:
-            from apps.doctors.models import DoctorSchedule
+            from apps.doctors.models import Doctor, DoctorScheduleSchedule
             schedule, _ = DoctorSchedule.objects.get_or_create(doctor=doctor)
             if available_days:
                 schedule.available_days = available_days
@@ -348,4 +363,92 @@ class AdminDoctorBulkActionView(views.APIView):
             return Response({"message": f"Successfully deleted {count} doctors.", "count": count})
 
         return Response({"error": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminDoctorScheduleView(views.APIView):
+    """
+    Platform administrator doctor slot & schedule management.
+    GET /api/v1/admin/doctors/{id}/schedule/
+    PUT /api/v1/admin/doctors/{id}/schedule/
+    """
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request, pk):
+        try:
+            doctor = Doctor.objects.select_related('hospital', 'clinic').get(pk=pk)
+        except Doctor.DoesNotExist:
+            return Response({'error': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        schedule, _ = DoctorSchedule.objects.get_or_create(
+            doctor=doctor,
+            defaults={
+                'available_days': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Sunday'],
+                'standard_slots': [
+                    '09:00 - 09:30', '09:30 - 10:00', '10:00 - 10:30', '10:30 - 11:00',
+                    '11:00 - 11:30', '11:30 - 12:00', '14:00 - 14:30', '14:30 - 15:00',
+                    '15:00 - 15:30', '15:30 - 16:00', '16:00 - 16:30', '16:30 - 17:00'
+                ],
+                'slot_duration_minutes': 30,
+            }
+        )
+
+        facility_name = doctor.hospital.name if doctor.hospital else (doctor.clinic.name if doctor.clinic else 'Unassigned')
+        return Response({
+            'doctor_id': str(doctor.id),
+            'doctor_name': doctor.name,
+            'specialty': doctor.specialty,
+            'facility': facility_name,
+            'available_days': schedule.available_days or [],
+            'standard_slots': schedule.standard_slots or [],
+            'slot_duration_minutes': schedule.slot_duration_minutes or 30,
+            'updated_at': schedule.updated_at
+        }, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        try:
+            doctor = Doctor.objects.select_related('hospital', 'clinic').get(pk=pk)
+        except Doctor.DoesNotExist:
+            return Response({'error': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        schedule, _ = DoctorSchedule.objects.get_or_create(doctor=doctor)
+        data = request.data
+
+        if 'available_days' in data and isinstance(data['available_days'], list):
+            schedule.available_days = data['available_days']
+        if 'standard_slots' in data and isinstance(data['standard_slots'], list):
+            schedule.standard_slots = data['standard_slots']
+        if 'slot_duration_minutes' in data:
+            try:
+                schedule.slot_duration_minutes = int(data['slot_duration_minutes'])
+            except (ValueError, TypeError):
+                pass
+
+        schedule.save()
+
+        log_audit_event(
+            action="DOCTOR_SCHEDULE_UPDATED",
+            target_model="DoctorSchedule",
+            target_id=str(doctor.id),
+            actor=request.user,
+            change_summary={
+                'doctor': doctor.name,
+                'available_days': schedule.available_days,
+                'slot_count': len(schedule.standard_slots),
+                'slot_duration': schedule.slot_duration_minutes
+            },
+            request=request
+        )
+
+        facility_name = doctor.hospital.name if doctor.hospital else (doctor.clinic.name if doctor.clinic else 'Unassigned')
+        return Response({
+            'success': True,
+            'message': f"Schedule for Dr. {doctor.name} updated successfully.",
+            'doctor_id': str(doctor.id),
+            'doctor_name': doctor.name,
+            'facility': facility_name,
+            'available_days': schedule.available_days,
+            'standard_slots': schedule.standard_slots,
+            'slot_duration_minutes': schedule.slot_duration_minutes,
+        }, status=status.HTTP_200_OK)
+
 

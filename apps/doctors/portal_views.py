@@ -364,9 +364,9 @@ class DoctorPatientListView(views.APIView):
             page = 1
 
         try:
-            page_size = min(50, max(1, int(request.query_params.get('page_size', 10))))
+            page_size = min(100, max(1, int(request.query_params.get('page_size', 20))))
         except (ValueError, TypeError):
-            page_size = 10
+            page_size = 20
 
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size

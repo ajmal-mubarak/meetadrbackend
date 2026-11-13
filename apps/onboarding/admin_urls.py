@@ -17,6 +17,7 @@ from apps.doctors.admin_views import (
     AdminDoctorDetailView,
     AdminDoctorStatusView,
     AdminDoctorBulkActionView,
+    AdminDoctorScheduleView,
 )
 from apps.appointments.admin_views import (
     AdminBookingListView,
@@ -57,6 +58,7 @@ urlpatterns = [
     path('doctors/bulk-action/', AdminDoctorBulkActionView.as_view(), name='admin_doctor_bulk_action'),
     path('doctors/<uuid:pk>/', AdminDoctorDetailView.as_view(), name='admin_doctor_detail'),
     path('doctors/<uuid:pk>/status/', AdminDoctorStatusView.as_view(), name='admin_doctor_status'),
+    path('doctors/<uuid:pk>/schedule/', AdminDoctorScheduleView.as_view(), name='admin_doctor_schedule'),
 
     # Cloud Photo & Media Management: /api/v1/admin/photos/
     path('photos/', AdminPhotoListView.as_view(), name='admin_photos_list'),
