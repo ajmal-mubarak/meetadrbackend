@@ -300,7 +300,15 @@ class AdminBulkImportDoctorsView(views.APIView):
             contact_number = rec.get('contactnumber', '').strip()
             email = rec.get('doctoremail', '').strip() or rec.get('email', '').strip()
             about = rec.get('doctorprofilebiography', '').strip() or rec.get('doctorprofile', '').strip() or f"{full_name} is an accredited medical specialist."
-            photo = rec.get('doctorphotofilename', '').strip() or rec.get('doctorimagefilename', '').strip() or rec.get('photo', '').strip()
+            photo = (
+                rec.get('doctorphotourl', '').strip()
+                or rec.get('doctorimageurl', '').strip()
+                or rec.get('doctorphotofilename', '').strip()
+                or rec.get('doctorimagefilename', '').strip()
+                or rec.get('photourl', '').strip()
+                or rec.get('imageurl', '').strip()
+                or rec.get('photo', '').strip()
+            )
             location = rec.get('emiratelocation', '').strip() or rec.get('location', '').strip() or (facility_hospital.location if facility_hospital else (facility_clinic.location if facility_clinic else 'Dubai'))
 
             username = rec.get('usernameemail', '').strip() or rec.get('username', '').strip() or email or f"doc_{first_name.lower()}_{idx}"
@@ -542,8 +550,22 @@ class AdminBulkImportHospitalsView(views.APIView):
                 or rec.get('hospitalprofile', '').strip()
                 or f"{h_name} is an accredited healthcare facility in {emirate}."
             )
-            photo = rec.get('facilityimagefilename', '').strip() or rec.get('hospitalimage', '').strip()
-            logo = rec.get('facilitylogofilename', '').strip() or rec.get('hospitallogo', '').strip()
+            photo = (
+                rec.get('facilityimageurl', '').strip()
+                or rec.get('facilityimagefilename', '').strip()
+                or rec.get('facilityimage', '').strip()
+                or rec.get('hospitalimage', '').strip()
+                or rec.get('imageurl', '').strip()
+                or rec.get('photo', '').strip()
+            )
+            logo = (
+                rec.get('facilitylogourl', '').strip()
+                or rec.get('facilitylogofilename', '').strip()
+                or rec.get('facilitylogo', '').strip()
+                or rec.get('hospitallogo', '').strip()
+                or rec.get('logourl', '').strip()
+                or rec.get('logo', '').strip()
+            )
             ins_raw = (
                 rec.get('acceptedinsurances', '').strip()
                 or rec.get('acceptedinsurance', '').strip()
@@ -819,8 +841,12 @@ class FacilityBulkImportDoctorsView(views.APIView):
                 or f"{full_name} is an experienced specialist at {facility.name}."
             )
             photo = (
-                rec.get('doctorphotofilename', '').strip()
+                rec.get('doctorphotourl', '').strip()
+                or rec.get('doctorimageurl', '').strip()
+                or rec.get('doctorphotofilename', '').strip()
                 or rec.get('doctorimagefilename', '').strip()
+                or rec.get('photourl', '').strip()
+                or rec.get('imageurl', '').strip()
                 or rec.get('photo', '').strip()
             )
 
