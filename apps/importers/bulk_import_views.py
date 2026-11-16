@@ -946,14 +946,24 @@ class DownloadTemplateView(views.APIView):
         candidate_dirs = [settings.BASE_DIR, settings.BASE_DIR.parent]
         file_path = None
         fname = ''
+        is_empty_variant = str(request.query_params.get('empty', '')).lower() in ['1', 'true', 'yes'] or '_empty' in target
 
-        if target == 'doctors':
-            fname = 'Doctor Template.xlsx'
-            for d in candidate_dirs:
-                p = os.path.join(d, fname)
-                if os.path.exists(p):
-                    file_path = p
-                    break
+        clean_target = target.replace('_empty', '')
+        if clean_target in ['doctors', 'doctor']:
+            if is_empty_variant:
+                fname = 'Sample_Bulk_Doctors_Empty.xlsx'
+                for d in candidate_dirs:
+                    p = os.path.join(d, fname)
+                    if os.path.exists(p):
+                        file_path = p
+                        break
+            if not file_path:
+                fname = 'Doctor Template.xlsx'
+                for d in candidate_dirs:
+                    p = os.path.join(d, fname)
+                    if os.path.exists(p):
+                        file_path = p
+                        break
             if not file_path:
                 for d in candidate_dirs:
                     p = os.path.join(d, 'Template - Doctors Data.xlsx')
@@ -961,13 +971,21 @@ class DownloadTemplateView(views.APIView):
                         file_path = p
                         fname = 'Template - Doctors Data.xlsx'
                         break
-        elif target in ['hospitals', 'hospital']:
-            fname = 'Hospital Template.xlsx'
-            for d in candidate_dirs:
-                p = os.path.join(d, fname)
-                if os.path.exists(p):
-                    file_path = p
-                    break
+        elif clean_target in ['hospitals', 'hospital']:
+            if is_empty_variant:
+                fname = 'Sample_Bulk_Hospitals_Empty.xlsx'
+                for d in candidate_dirs:
+                    p = os.path.join(d, fname)
+                    if os.path.exists(p):
+                        file_path = p
+                        break
+            if not file_path:
+                fname = 'Hospital Template.xlsx'
+                for d in candidate_dirs:
+                    p = os.path.join(d, fname)
+                    if os.path.exists(p):
+                        file_path = p
+                        break
             if not file_path:
                 for d in candidate_dirs:
                     p = os.path.join(d, 'Template - HOSPTIAL Data.xlsx')

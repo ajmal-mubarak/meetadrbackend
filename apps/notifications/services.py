@@ -62,43 +62,55 @@ from django.core.mail import send_mail
 def send_booking_notification_email_to_admins(appointment) -> bool:
     """
     Sends new booking notification email to Facility Administrators and Platform Admins.
-    Formats the details according to the standard MeetAdr administrative template,
-    ensuring 'Location' is shown instead of 'Branch'.
+    Formats the details according to the standard MeetAdr administrative template:
+    New Booking ID# : MD######
+    Hospital: <Name>
+    Branch: <Branch>
+    Date & Time: DD/MM/YYYY, HH:MM (UAE Time)
+    Patient Name: <Name>
+    Patient Contact #: <Phone with Country Prefix>
+    Patient Email: <Email>
+
+    Regards
+    Team MeetAdr.com
     """
     facility = appointment.hospital or appointment.clinic
     facility_name = getattr(facility, 'name', '') or 'MeetAdr Medical Facility'
-    location = getattr(facility, 'location', '') or getattr(appointment.doctor, 'location', '') or 'United Arab Emirates'
+    branch_name = getattr(facility, 'location', '') or getattr(appointment.doctor, 'location', '') or 'Main Branch'
     
-    # Format date & time nicely (e.g. August 03, 2025, 15:30)
+    # Format date & time nicely as DD/MM/YYYY
     try:
         if hasattr(appointment.date, 'strftime'):
-            formatted_date = appointment.date.strftime('%B %d, %Y')
+            formatted_date = appointment.date.strftime('%d/%m/%Y')
         else:
             from datetime import datetime
             parsed_date = datetime.strptime(str(appointment.date), '%Y-%m-%d')
-            formatted_date = parsed_date.strftime('%B %d, %Y')
+            formatted_date = parsed_date.strftime('%d/%m/%Y')
     except Exception:
         formatted_date = str(appointment.date)
     
     time_val = appointment.time_slot or 'Standard Slot'
-    date_time_str = f"{formatted_date}, {time_val}"
+    date_time_str = f"{formatted_date}, {time_val} (UAE Time)"
     
     patient_name = appointment.patient_name_snapshot or 'Patient'
     patient_phone = appointment.patient_phone_snapshot or '—'
     patient_email = appointment.patient_email_snapshot or 'N/A'
+
+    app_id_raw = str(appointment.id).replace('-', '')
+    app_id_short = f"MD{app_id_raw[:6].upper()}" if app_id_raw else "MD000000"
     
-    subject = f"New Booking: {facility_name} - {date_time_str}"
+    subject = f"New Booking ID# : {app_id_short} - {facility_name}"
     
     plain_message = (
-        "New Booking:\n"
+        f"New Booking ID# : {app_id_short}\n"
         f"Hospital: {facility_name}\n"
-        f"Location: {location}\n"
+        f"Branch: {branch_name}\n"
         f"Date & Time: {date_time_str}\n"
         f"Patient Name: {patient_name}\n"
         f"Patient Contact #: {patient_phone}\n"
-        f"Patient Email (Optional): {patient_email}\n\n"
+        f"Patient Email: {patient_email}\n\n"
         "Regards\n"
-        "Team MeetAdr.com"
+        "Team MeetAdr.com\n"
     )
     
     html_message = f"""
@@ -119,7 +131,7 @@ def send_booking_notification_email_to_admins(appointment) -> bool:
     </head>
     <body>
       <div class="booking-card">
-        <div class="booking-header">New Booking:</div>
+        <div class="booking-header">New Booking ID# : {app_id_short}</div>
         <table>
           <tbody>
             <tr>
@@ -127,8 +139,8 @@ def send_booking_notification_email_to_admins(appointment) -> bool:
               <td class="value">{facility_name}</td>
             </tr>
             <tr>
-              <td class="label">Location</td>
-              <td class="value">{location}</td>
+              <td class="label">Branch</td>
+              <td class="value">{branch_name}</td>
             </tr>
             <tr>
               <td class="label">Date & Time</td>
@@ -143,7 +155,7 @@ def send_booking_notification_email_to_admins(appointment) -> bool:
               <td class="value">{patient_phone}</td>
             </tr>
             <tr>
-              <td class="label">Patient Email (Optional)</td>
+              <td class="label">Patient Email</td>
               <td class="value">{patient_email}</td>
             </tr>
           </tbody>
@@ -190,7 +202,7 @@ def send_booking_notification_email_to_admins(appointment) -> bool:
 def send_booking_notification_email_to_patient(appointment) -> bool:
     """
     Sends the booking request notification email to the patient with the template:
-    We've received your booking request for Dr. [Last Name]. Our hospital team will call you shortly to confirm your final date and time slot.
+    Your booking request for Dr. [Doctor Name] has been received. Our team will contact you shortly with the confirmation
 
     Regards
     Team MeetAdr.com
@@ -203,12 +215,12 @@ def send_booking_notification_email_to_patient(appointment) -> bool:
         logger.info(f"No patient email found for appointment {appointment.id}, skipping patient email dispatch.")
         return False
 
-    doc_last_name = _format_doctor_last_name(appointment.doctor)
-    subject = f"Booking Request Received for Dr. {doc_last_name} | MeetAdr"
+    doc_name = _format_doctor_name(appointment.doctor)
+    subject = f"Booking Request Received for {doc_name} | MeetAdr"
 
     plain_message = (
-        f"We've received your booking request for Dr. {doc_last_name}. "
-        "Our hospital team will call you shortly to confirm your final date and time slot.\n\n"
+        f"Your booking request for {doc_name} has been received. "
+        "Our team will contact you shortly with the confirmation\n\n"
         "Regards\n"
         "Team MeetAdr.com\n"
     )
@@ -226,7 +238,7 @@ def send_booking_notification_email_to_patient(appointment) -> bool:
           <h2 style="margin: 0; color: #0e7490; font-size: 20px; font-weight: 800;">MeetAdr.com</h2>
         </div>
         <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 24px;">
-          We've received your booking request for <strong>Dr. {doc_last_name}</strong>. Our hospital team will call you shortly to confirm your final date and time slot.
+          Your booking request for <strong>{doc_name}</strong> has been received. Our team will contact you shortly with the confirmation
         </p>
         <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2ebf0; font-size: 14px; color: #64748b;">
           <p style="margin: 0; font-weight: 600; color: #334155;">Regards</p>
@@ -260,7 +272,6 @@ def notify_appointment_booked(appointment):
     upon successful booking. Also dispatches the structured booking email to admins and patient.
     """
     doc_name = _format_doctor_name(appointment.doctor)
-    doc_last_name = _format_doctor_last_name(appointment.doctor)
     facility = appointment.hospital or appointment.clinic
     facility_name = facility.name if facility else "the facility"
     location = getattr(facility, 'location', '') or getattr(appointment.doctor, 'location', '') or 'UAE'
@@ -268,8 +279,8 @@ def notify_appointment_booked(appointment):
     # 1. Patient Notification
     patient_user = appointment.booked_by
     patient_desc = (
-        f"We've received your booking request for Dr. {doc_last_name}. "
-        "Our hospital team will call you shortly to confirm your final date and time slot."
+        f"Your booking request for {doc_name} has been received. "
+        "Our team will contact you shortly with the confirmation"
     )
 
     create_notification(
@@ -424,14 +435,116 @@ def notify_appointment_confirmed(appointment):
     send_booking_confirmed_email_to_patient(appointment)
 
 
+def notify_appointment_rescheduled(appointment, old_date=None, old_slot=None, rescheduled_by_user=None):
+    """
+    Notifies the patient, attending doctor, facility administrator, and platform admins
+    when an appointment has been rescheduled.
+    """
+    doc_name = _format_doctor_name(appointment.doctor)
+    facility = appointment.hospital or appointment.clinic
+    facility_name = facility.name if facility else "the facility"
+
+    # Format dates as DD/MM/YYYY
+    try:
+        if hasattr(appointment.date, 'strftime'):
+            new_date_str = appointment.date.strftime('%d/%m/%Y')
+        else:
+            from datetime import datetime
+            new_date_str = datetime.strptime(str(appointment.date), '%Y-%m-%d').strftime('%d/%m/%Y')
+    except Exception:
+        new_date_str = str(appointment.date)
+
+    time_val = appointment.time_slot or 'Standard Slot'
+    date_time_label = f"{new_date_str} at {time_val} (UAE Time)"
+
+    # 1. Patient In-App & Email Notification
+    patient_user = appointment.booked_by
+    create_notification(
+        user=patient_user,
+        title="Appointment Rescheduled",
+        description=f"Your appointment with {doc_name} at {facility_name} has been rescheduled to {date_time_label}.",
+        notification_type=NotificationType.APPOINTMENT,
+        link="/patient/bookings"
+    )
+
+    patient_email = getattr(appointment, 'patient_email_snapshot', None)
+    if not patient_email and patient_user:
+        patient_email = getattr(patient_user, 'email', None)
+
+    if patient_email:
+        subject = f"Appointment Rescheduled - {doc_name} | MeetAdr"
+        plain_msg = (
+            f"Your appointment with {doc_name} at {facility_name} has been rescheduled to {date_time_label}.\n\n"
+            "Regards\n"
+            "Team MeetAdr.com\n"
+        )
+        try:
+            send_mail(
+                subject=subject,
+                message=plain_msg,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@meetadr.com'),
+                recipient_list=[patient_email.lower().strip()],
+                fail_silently=True
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to dispatch reschedule email to patient: {exc}")
+
+    # 2. Doctor Notification
+    doctor_user = getattr(appointment.doctor, 'user', None)
+    if doctor_user and doctor_user != rescheduled_by_user:
+        patient_name = appointment.patient_name_snapshot or getattr(patient_user, 'name', 'Patient')
+        create_notification(
+            user=doctor_user,
+            title="Appointment Rescheduled",
+            description=f"Consultation with {patient_name} has been rescheduled to {date_time_label}.",
+            notification_type=NotificationType.APPOINTMENT,
+            link="/doctor/bookings"
+        )
+
+    # 3. Facility Administrator In-App Notification
+    facility_admin = getattr(facility, 'admin_user', None) if facility else None
+    if facility_admin and facility_admin != rescheduled_by_user:
+        create_notification(
+            user=facility_admin,
+            title="Appointment Rescheduled",
+            description=f"Appointment for {doc_name} at {facility_name} rescheduled to {date_time_label}.",
+            notification_type=NotificationType.APPOINTMENT,
+            link="/hospital/dashboard"
+        )
+
+    # 4. Platform Admins In-App Notification
+    for admin_u in User.objects.filter(role=UserRole.ADMIN):
+        if admin_u != rescheduled_by_user:
+            create_notification(
+                user=admin_u,
+                title="Appointment Rescheduled",
+                description=f"Booking for {doc_name} at {facility_name} rescheduled to {date_time_label}.",
+                notification_type=NotificationType.APPOINTMENT,
+                link="/admin/bookings"
+            )
+
+
 def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: str = ""):
     """
     Notifies the appropriate parties when an appointment is cancelled.
+    Includes cancellation reason and sends email notification to patient.
     """
     doctor_user = getattr(appointment.doctor, 'user', None)
     patient_user = appointment.booked_by
     role = appointment.cancelled_by_role
     doc_name = _format_doctor_name(appointment.doctor)
+
+    try:
+        if hasattr(appointment.date, 'strftime'):
+            date_str = appointment.date.strftime('%d/%m/%Y')
+        else:
+            from datetime import datetime
+            date_str = datetime.strptime(str(appointment.date), '%Y-%m-%d').strftime('%d/%m/%Y')
+    except Exception:
+        date_str = str(appointment.date)
+
+    time_str = f"{appointment.time_slot} (UAE Time)" if appointment.time_slot else "UAE Time"
+    reason_note = f" Reason: {reason}" if reason else ""
 
     # Cancelled by patient -> notify doctor
     if role == 'patient' or (cancelled_by_user and cancelled_by_user == patient_user):
@@ -439,7 +552,7 @@ def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: st
             create_notification(
                 user=doctor_user,
                 title="Appointment Cancelled",
-                description=f"Consultation scheduled for {appointment.date} at {appointment.time_slot} was cancelled by patient.",
+                description=f"Consultation scheduled for {date_str} at {time_str} was cancelled by patient.{reason_note}",
                 notification_type=NotificationType.APPOINTMENT,
                 link="/doctor/dashboard"
             )
@@ -449,7 +562,7 @@ def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: st
         create_notification(
             user=patient_user,
             title="Appointment Cancelled",
-            description=f"Your appointment on {appointment.date} was cancelled by {doc_name}.",
+            description=f"Your appointment on {date_str} at {time_str} was cancelled by {doc_name}.{reason_note}",
             notification_type=NotificationType.APPOINTMENT,
             link="/patient/bookings"
         )
@@ -459,7 +572,7 @@ def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: st
         create_notification(
             user=patient_user,
             title="Appointment Cancelled",
-            description=f"Your appointment on {appointment.date} was cancelled by administration.",
+            description=f"Your appointment on {date_str} at {time_str} was cancelled by administration.{reason_note}",
             notification_type=NotificationType.APPOINTMENT,
             link="/patient/bookings"
         )
@@ -467,10 +580,32 @@ def notify_appointment_cancelled(appointment, cancelled_by_user=None, reason: st
             create_notification(
                 user=doctor_user,
                 title="Appointment Cancelled",
-                description=f"Consultation scheduled for {appointment.date} at {appointment.time_slot} was cancelled by administration.",
+                description=f"Consultation scheduled for {date_str} at {time_str} was cancelled by administration.{reason_note}",
                 notification_type=NotificationType.APPOINTMENT,
                 link="/doctor/dashboard"
             )
+
+    # If cancelled by hospital/doctor/admin, also send email to patient
+    if role != 'patient' and cancelled_by_user != patient_user:
+        patient_email = getattr(appointment, 'patient_email_snapshot', None)
+        if not patient_email and patient_user:
+            patient_email = getattr(patient_user, 'email', None)
+        if patient_email:
+            plain_body = (
+                f"Your appointment with {doc_name} on {date_str} at {time_str} has been cancelled.{reason_note}\n\n"
+                "Regards\n"
+                "Team MeetAdr.com\n"
+            )
+            try:
+                send_mail(
+                    subject=f"Appointment Cancelled - {doc_name} | MeetAdr",
+                    message=plain_body,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@meetadr.com'),
+                    recipient_list=[patient_email.lower().strip()],
+                    fail_silently=True
+                )
+            except Exception as exc:
+                logger.warning(f"Failed to dispatch cancellation email to patient: {exc}")
 
 
 def notify_appointment_completed(appointment):

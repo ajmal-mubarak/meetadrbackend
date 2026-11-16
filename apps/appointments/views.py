@@ -29,6 +29,7 @@ from apps.notifications.services import (
     notify_appointment_booked,
     notify_appointment_confirmed,
     notify_appointment_cancelled,
+    notify_appointment_rescheduled,
     notify_appointment_completed,
     notify_review_submitted,
 )
@@ -552,6 +553,18 @@ class AppointmentRescheduleView(views.APIView):
             },
             request=request
         )
+
+        # Dispatch reschedule notifications (in-app and email)
+        try:
+            notify_appointment_rescheduled(
+                appointment,
+                old_date=old_date,
+                old_slot=old_slot,
+                rescheduled_by_user=user
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to dispatch reschedule notification: {exc}")
 
         return Response(AppointmentDetailSerializer(appointment).data, status=status.HTTP_200_OK)
 
