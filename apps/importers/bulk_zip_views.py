@@ -3,10 +3,15 @@ API Views for Enterprise Bulk Doctor Import with ZIP Archive.
 Provides Preview/Dry-run validation, background execution, and progress tracking.
 """
 import io
+import os
 import re
 import csv
 import uuid
-import openpyxl
+from django.conf import settings
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
 from rest_framework import views, status, permissions
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
@@ -70,6 +75,13 @@ def parse_spreadsheet_to_records(file_obj) -> list:
                 records.append(normalized_row)
     else:
         # Excel parsing
+        global openpyxl
+        if openpyxl is None:
+            try:
+                import openpyxl as ox
+                openpyxl = ox
+            except ImportError:
+                raise ValidationError("Excel processing library (openpyxl) is not available on this server.")
         wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
         ws = wb.active
         headers = []
@@ -257,6 +269,32 @@ class BulkDoctorZipTemplateDownloadView(views.APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        global openpyxl
+        if openpyxl is None:
+            try:
+                import openpyxl as ox
+                openpyxl = ox
+            except ImportError:
+                openpyxl = None
+
+        if openpyxl is None:
+            # Fallback to pre-generated template file on disk
+            candidate_paths = [
+                os.path.join(settings.BASE_DIR, 'Sample_Bulk_Doctors_Empty.xlsx'),
+                os.path.join(settings.BASE_DIR.parent, 'Sample_Bulk_Doctors_Empty.xlsx') if hasattr(settings.BASE_DIR, 'parent') else None
+            ]
+            for p in candidate_paths:
+                if p and os.path.exists(p):
+                    with open(p, 'rb') as f:
+                        data = f.read()
+                    response = HttpResponse(
+                        data,
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+                    response['Content-Disposition'] = 'attachment; filename="Enterprise_Doctor_ZIP_Template.xlsx"'
+                    return response
+            return Response({'error': 'Template generator not available'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Doctors Bulk Import"
