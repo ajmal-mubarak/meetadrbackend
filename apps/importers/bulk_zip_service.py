@@ -8,7 +8,7 @@ import os
 import re
 import zipfile
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Any, List, Tuple
 from django.db import transaction
 from django.db.models import Q
@@ -312,13 +312,16 @@ class BulkDoctorZipService:
             try:
                 job = BulkDoctorImportJob.objects.get(id=job_id)
                 job.status = 'importing'
-                job.save(update_fields=['status', 'updated_at'])
+                job.preview_data = job.preview_data or {}
+                job.preview_data['current_phase'] = 'Matching doctor headshots from ZIP...'
+                job.preview_data['progress_percent'] = 5
+                job.save(update_fields=['status', 'preview_data', 'updated_at'])
 
                 z = zipfile.ZipFile(zip_file_obj)
                 photo_map, _, _ = cls.inspect_zip(zip_file_obj)
 
-                # 1. Pre-match all photos and upload them concurrently (5 workers)
-                matched_upload_items = []
+                # 1. Pre-match, read bytes, and optimize on main thread safely
+                items_to_upload = []
                 for idx, rec in enumerate(excel_records, start=1):
                     photo_field = (
                         rec.get('doctorphotofilename', '').strip()
@@ -364,24 +367,41 @@ class BulkDoctorZipService:
                     if matched_zip_file:
                         clean_filename = f"doc_{(doc_id or full_name).lower()}_{idx}.webp"
                         clean_filename = re.sub(r'[^a-zA-Z0-9_\.]', '_', clean_filename)
-                        matched_upload_items.append((idx, matched_zip_file, clean_filename))
+                        try:
+                            raw_bytes = z.read(matched_zip_file)
+                            webp_bytes, mime = cls.optimize_image(raw_bytes, max_dim=800, quality=85)
+                            items_to_upload.append((idx, webp_bytes, clean_filename))
+                        except Exception:
+                            pass
 
+                total_photos = len(items_to_upload)
                 uploaded_photo_urls = {}
+                uploaded_count = 0
+
                 def _upload_worker(item):
-                    r_idx, r_zip_file, r_clean_fn = item
+                    r_idx, r_webp_bytes, r_clean_fn = item
                     try:
-                        raw_bytes = z.read(r_zip_file)
-                        webp_bytes, mime = cls.optimize_image(raw_bytes, max_dim=800, quality=85)
-                        res = upload_photo(webp_bytes, r_clean_fn, category='doctors', content_type='image/webp')
+                        res = upload_photo(r_webp_bytes, r_clean_fn, category='doctors', content_type='image/webp')
                         return r_idx, res.get('url', '')
                     except Exception:
                         return r_idx, ''
 
-                if matched_upload_items:
+                if items_to_upload:
+                    job.preview_data['current_phase'] = f"Uploading photo 1 of {total_photos} to cloud storage..."
+                    job.preview_data['progress_percent'] = 10
+                    job.save(update_fields=['preview_data', 'updated_at'])
+
                     with ThreadPoolExecutor(max_workers=5) as executor:
-                        for r_idx, r_url in executor.map(_upload_worker, matched_upload_items):
+                        future_to_item = {executor.submit(_upload_worker, item): item for item in items_to_upload}
+                        for future in as_completed(future_to_item):
+                            r_idx, r_url = future.result()
                             if r_url:
                                 uploaded_photo_urls[r_idx] = r_url
+                            uploaded_count += 1
+                            pct = 10 + int((uploaded_count / max(1, total_photos)) * 45)  # 10% -> 55%
+                            job.preview_data['current_phase'] = f"Uploaded photo {uploaded_count} of {total_photos} to cloud storage..."
+                            job.preview_data['progress_percent'] = pct
+                            job.save(update_fields=['preview_data', 'updated_at'])
 
                 # Pre-compute default password hash once (saves 700x PBKDF2 CPU hashing time)
                 default_hashed_pw = make_password('Doctor@12345')
@@ -391,8 +411,13 @@ class BulkDoctorZipService:
                 failed = 0
                 skipped = 0
 
-                BATCH_SIZE = 25
-                for batch_start in range(0, len(excel_records), BATCH_SIZE):
+                total_to_process = len(excel_records)
+                job.preview_data['current_phase'] = "Writing doctor profiles and generating accounts..."
+                job.preview_data['progress_percent'] = 60
+                job.save(update_fields=['preview_data', 'updated_at'])
+
+                BATCH_SIZE = 5
+                for batch_start in range(0, total_to_process, BATCH_SIZE):
                     batch_slice = excel_records[batch_start:batch_start + BATCH_SIZE]
                     with transaction.atomic():
                         for batch_offset, rec in enumerate(batch_slice):
@@ -508,18 +533,23 @@ class BulkDoctorZipService:
                             successful += 1
 
                     # Update progress after batch commit
+                    pct = 60 + int((processed / max(1, total_to_process)) * 38)
                     job.processed_records = processed
                     job.successful_records = successful
                     job.failed_records = failed
                     job.skipped_records = skipped
-                    job.save(update_fields=['processed_records', 'successful_records', 'failed_records', 'skipped_records', 'updated_at'])
+                    job.preview_data['current_phase'] = f"Imported {processed} of {total_to_process} doctors..."
+                    job.preview_data['progress_percent'] = pct
+                    job.save(update_fields=['processed_records', 'successful_records', 'failed_records', 'skipped_records', 'preview_data', 'updated_at'])
 
                 job.status = 'completed'
                 job.processed_records = processed
                 job.successful_records = successful
                 job.failed_records = failed
                 job.skipped_records = skipped
-                job.save()
+                job.preview_data['current_phase'] = "Import completed successfully!"
+                job.preview_data['progress_percent'] = 100
+                job.save(update_fields=['status', 'processed_records', 'successful_records', 'failed_records', 'skipped_records', 'preview_data', 'updated_at'])
 
             except Exception as e:
                 try:

@@ -212,12 +212,30 @@ class BulkDoctorZipStatusView(views.APIView):
     def get(self, request, job_id):
         job = get_object_or_404(BulkDoctorImportJob, id=job_id)
         total = job.total_records or 1
-        pct = min(100, int((job.processed_records / total) * 100)) if total > 0 else 0
+        preview = job.preview_data or {}
+
+        pct = preview.get('progress_percent')
+        if pct is None:
+            pct = min(100, int((job.processed_records / total) * 100)) if total > 0 else 0
+        if job.status == 'completed':
+            pct = 100
+
+        current_phase = preview.get('current_phase')
+        if not current_phase:
+            if job.status == 'completed':
+                current_phase = 'Import complete!'
+            elif job.status == 'failed':
+                current_phase = 'Import failed.'
+            elif job.status == 'importing':
+                current_phase = f"Processing {job.processed_records} of {total} records..."
+            else:
+                current_phase = 'Queued...'
 
         return Response({
             'job_id': str(job.id),
             'status': job.status,
-            'percentage': pct if job.status != 'completed' else 100,
+            'percentage': pct,
+            'current_phase': current_phase,
             'total_records': job.total_records,
             'processed_records': job.processed_records,
             'successful_records': job.successful_records,
