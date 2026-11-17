@@ -175,6 +175,8 @@ class BulkDoctorZipService:
             contact_number = rec.get('contactnumber', '').strip() or rec.get('phone', '').strip()
             photo_field = (
                 rec.get('doctorphotofilename', '').strip()
+                or rec.get('doctorphotofilenameurl', '').strip()
+                or rec.get('doctorphoto', '').strip()
                 or rec.get('photofilename', '').strip()
                 or rec.get('photoname', '').strip()
                 or rec.get('image', '').strip()
@@ -320,7 +322,10 @@ class BulkDoctorZipService:
                 for idx, rec in enumerate(excel_records, start=1):
                     photo_field = (
                         rec.get('doctorphotofilename', '').strip()
+                        or rec.get('doctorphotofilenameurl', '').strip()
+                        or rec.get('doctorphoto', '').strip()
                         or rec.get('photofilename', '').strip()
+                        or rec.get('doctorphotourl', '').strip()
                         or rec.get('photo', '').strip()
                     )
                     doc_id = (
