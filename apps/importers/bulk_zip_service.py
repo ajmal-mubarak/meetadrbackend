@@ -268,7 +268,7 @@ class BulkDoctorZipService:
         unused_photos = sorted(list(all_zip_valid_photos - matched_zip_filenames))
 
         job = BulkDoctorImportJob.objects.create(
-            hospital=target_hospital,
+            hospital=target_hospital if isinstance(target_hospital, Hospital) else None,
             created_by=user,
             status='preview_ready',
             total_records=total_records,
@@ -284,6 +284,8 @@ class BulkDoctorZipService:
                 'unused_photos': unused_photos[:100],  # first 100 unused filenames
                 'total_unused_count': len(unused_photos),
                 'invalid_files_in_zip': invalid_files[:50],
+                'hospital_name': getattr(target_hospital, 'name', 'Unassigned') if target_hospital else 'Unassigned',
+                'facility_type': 'Clinic' if isinstance(target_hospital, Clinic) else ('Hospital' if target_hospital else 'Unassigned'),
             },
             error_log=[
                 {'row': d['row'], 'name': d['name'], 'error': d['dup_reason'] or (', '.join(d['errors']))}
@@ -436,8 +438,11 @@ class BulkDoctorZipService:
                                 dup_q = Doctor.objects.filter(Q(email__iexact=email) | Q(user__email__iexact=email))
                             if not dup_q.exists() and contact_number:
                                 dup_q = Doctor.objects.filter(contact_number=contact_number)
-                            if not dup_q.exists() and target_hospital:
-                                dup_q = Doctor.objects.filter(name__iexact=full_name, hospital=target_hospital, specialty__iexact=specialty)
+                            if not dup_q.exists():
+                                if isinstance(target_hospital, Hospital):
+                                    dup_q = Doctor.objects.filter(name__iexact=full_name, hospital=target_hospital, specialty__iexact=specialty)
+                                elif isinstance(target_hospital, Clinic):
+                                    dup_q = Doctor.objects.filter(name__iexact=full_name, clinic=target_hospital, specialty__iexact=specialty)
 
                             if dup_q.exists():
                                 skipped += 1
@@ -467,6 +472,10 @@ class BulkDoctorZipService:
                             # Doctor status
                             status = FacilityStatus.ACTIVE if activate_immediately else FacilityStatus.DEACTIVATED
 
+                            hosp_inst = target_hospital if isinstance(target_hospital, Hospital) else None
+                            clinic_inst = target_hospital if isinstance(target_hospital, Clinic) else None
+                            loc_val = getattr(target_hospital, 'location', '') or 'Dubai'
+
                             Doctor.objects.create(
                                 user=doc_user,
                                 name=full_name,
@@ -485,8 +494,9 @@ class BulkDoctorZipService:
                                 email=email or (user_email if '@' in user_email and not user_email.endswith('@meetadr.local') else ''),
                                 photo=photo_url,
                                 experience_years=exp_years,
-                                hospital=target_hospital,
-                                location=target_hospital.location if target_hospital else 'Dubai',
+                                hospital=hosp_inst,
+                                clinic=clinic_inst,
+                                location=loc_val,
                                 about=about,
                                 status=status
                             )

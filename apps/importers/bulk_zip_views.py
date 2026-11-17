@@ -14,9 +14,39 @@ from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 
 from apps.accounts.permissions import IsPlatformAdmin, IsFacilityAdmin
-from apps.facilities.models import Hospital
+from apps.facilities.models import Hospital, Clinic
 from apps.doctors.models import BulkDoctorImportJob
 from apps.importers.bulk_zip_service import BulkDoctorZipService
+
+
+def resolve_target_facility(facility_id, user):
+    """
+    Resolves facility as either a Hospital or Clinic model instance.
+    Returns user-friendly validation error if specified ID is not found.
+    """
+    if facility_id:
+        # Check Hospital
+        try:
+            return Hospital.objects.get(id=facility_id)
+        except (Hospital.DoesNotExist, ValueError):
+            pass
+        # Check Clinic
+        try:
+            return Clinic.objects.get(id=facility_id)
+        except (Clinic.DoesNotExist, ValueError):
+            pass
+        raise ValidationError({
+            'hospital_id': 'Selected healthcare facility was not found. Please choose an active hospital or clinic from the list.'
+        })
+
+    # Auto-assign if facility admin
+    if hasattr(user, 'role'):
+        if user.role == 'hospital':
+            return getattr(user, 'hospital_profile', None)
+        elif user.role == 'clinic':
+            return getattr(user, 'clinic_profile', None)
+
+    return None
 
 
 def parse_spreadsheet_to_records(file_obj) -> list:
@@ -78,16 +108,8 @@ class BulkDoctorZipPreviewView(views.APIView):
         if not zip_file:
             raise ValidationError({'zip': 'ZIP archive containing doctor photos is required.'})
 
-        hospital_id = request.data.get('hospital_id')
-        target_hospital = None
-        if hospital_id:
-            try:
-                target_hospital = Hospital.objects.get(id=hospital_id)
-            except Hospital.DoesNotExist:
-                raise ValidationError({'hospital_id': f'Hospital with ID {hospital_id} not found.'})
-        elif request.user.role == 'hospital':
-            # Auto-assign hospital admin's facility
-            target_hospital = getattr(request.user, 'hospital_profile', None)
+        hospital_id = request.data.get('hospital_id') or request.data.get('facility_id')
+        target_facility = resolve_target_facility(hospital_id, request.user)
 
         excel_records = parse_spreadsheet_to_records(excel_file)
         if not excel_records:
@@ -97,7 +119,7 @@ class BulkDoctorZipPreviewView(views.APIView):
             job = BulkDoctorZipService.validate_and_preview(
                 excel_records=excel_records,
                 zip_file_obj=zip_file,
-                target_hospital=target_hospital,
+                target_hospital=target_facility,
                 user=request.user
             )
         except ValueError as e:
@@ -108,8 +130,9 @@ class BulkDoctorZipPreviewView(views.APIView):
         return Response({
             'job_id': str(job.id),
             'status': job.status,
-            'hospital_id': str(target_hospital.id) if target_hospital else None,
-            'hospital_name': target_hospital.name if target_hospital else 'Unassigned',
+            'hospital_id': str(target_facility.id) if target_facility else None,
+            'hospital_name': getattr(target_facility, 'name', 'Unassigned') if target_facility else 'Unassigned',
+            'facility_type': 'Clinic' if isinstance(target_facility, Clinic) else ('Hospital' if target_facility else 'Unassigned'),
             'total_records': job.total_records,
             'matched_photos': job.matched_photos,
             'missing_photos': job.missing_photos,
@@ -136,15 +159,8 @@ class BulkDoctorZipExecuteView(views.APIView):
         if not excel_file or not zip_file:
             raise ValidationError({'error': 'Both Excel file and ZIP archive are required.'})
 
-        hospital_id = request.data.get('hospital_id')
-        target_hospital = None
-        if hospital_id:
-            try:
-                target_hospital = Hospital.objects.get(id=hospital_id)
-            except Hospital.DoesNotExist:
-                pass
-        elif request.user.role == 'hospital':
-            target_hospital = getattr(request.user, 'hospital_profile', None)
+        hospital_id = request.data.get('hospital_id') or request.data.get('facility_id')
+        target_facility = resolve_target_facility(hospital_id, request.user)
 
         activate_immediately = str(request.data.get('activate_immediately', '')).lower() in ['true', '1', 'yes']
 
@@ -160,7 +176,7 @@ class BulkDoctorZipExecuteView(views.APIView):
 
         if not job:
             job = BulkDoctorImportJob.objects.create(
-                hospital=target_hospital,
+                hospital=target_facility if isinstance(target_facility, Hospital) else None,
                 created_by=request.user,
                 status='pending',
                 total_records=len(excel_records)
@@ -174,7 +190,7 @@ class BulkDoctorZipExecuteView(views.APIView):
             job_id=str(job.id),
             excel_records=excel_records,
             zip_file_obj=zip_copy,
-            target_hospital=target_hospital,
+            target_hospital=target_facility,
             activate_immediately=activate_immediately
         )
 
