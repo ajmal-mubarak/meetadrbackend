@@ -122,3 +122,54 @@ class DoctorSchedule(models.Model):
 
     def __str__(self):
         return f"Schedule for {self.doctor.name}"
+
+
+class BulkDoctorImportJob(models.Model):
+    """Tracks background bulk doctor imports with Excel + ZIP headshots."""
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('validating', 'Validating'),
+        ('preview_ready', 'Preview Ready'),
+        ('importing', 'Importing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    hospital = models.ForeignKey(
+        Hospital,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='doctor_import_jobs'
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='doctor_import_jobs'
+    )
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default='pending', db_index=True)
+    total_records = models.PositiveIntegerField(default=0)
+    processed_records = models.PositiveIntegerField(default=0)
+    successful_records = models.PositiveIntegerField(default=0)
+    failed_records = models.PositiveIntegerField(default=0)
+    skipped_records = models.PositiveIntegerField(default=0)
+    matched_photos = models.PositiveIntegerField(default=0)
+    missing_photos = models.PositiveIntegerField(default=0)
+    unused_photos = models.PositiveIntegerField(default=0)
+    preview_data = models.JSONField(default=dict, blank=True)
+    error_log = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'meetadr_doctor_import_jobs'
+        ordering = ['-created_at']
+        verbose_name = 'Bulk Doctor Import Job'
+        verbose_name_plural = 'Bulk Doctor Import Jobs'
+
+    def __str__(self):
+        return f"ImportJob {self.id} ({self.status}) - {self.processed_records}/{self.total_records}"
+

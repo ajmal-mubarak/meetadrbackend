@@ -37,6 +37,12 @@ from apps.importers.bulk_import_views import (
     AdminBulkImportHospitalsView,
     DownloadTemplateView,
 )
+from apps.importers.bulk_zip_views import (
+    BulkDoctorZipPreviewView,
+    BulkDoctorZipExecuteView,
+    BulkDoctorZipStatusView,
+    BulkDoctorZipTemplateDownloadView,
+)
 
 app_name = 'admin_onboarding'
 
@@ -69,6 +75,12 @@ urlpatterns = [
     path('import/doctors/', AdminBulkImportDoctorsView.as_view(), name='admin_import_doctors'),
     path('import/hospitals/', AdminBulkImportHospitalsView.as_view(), name='admin_import_hospitals'),
     path('import/template/<str:target>/', DownloadTemplateView.as_view(), name='admin_import_template'),
+
+    # Enterprise Bulk Doctor Importer with ZIP: /api/v1/admin/import/doctors-zip/
+    path('import/doctors-zip/preview/', BulkDoctorZipPreviewView.as_view(), name='admin_doctors_zip_preview'),
+    path('import/doctors-zip/execute/', BulkDoctorZipExecuteView.as_view(), name='admin_doctors_zip_execute'),
+    path('import/doctors-zip/status/<uuid:job_id>/', BulkDoctorZipStatusView.as_view(), name='admin_doctors_zip_status'),
+    path('import/doctors-zip/template/', BulkDoctorZipTemplateDownloadView.as_view(), name='admin_doctors_zip_template'),
 
     # Platform-wide patient management: /api/v1/admin/patients/
     path('patients/', AdminPatientListView.as_view(), name='admin_patient_list'),
