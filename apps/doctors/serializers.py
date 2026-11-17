@@ -138,7 +138,11 @@ class DoctorListSerializer(serializers.ModelSerializer):
         return str(obj.hospital_id) if obj.hospital_id else None
 
     def get_hospital_name(self, obj):
-        return obj.hospital.name if obj.hospital else None
+        if obj.hospital:
+            return obj.hospital.name
+        if obj.clinic:
+            return obj.clinic.name
+        return None
 
     def get_hospital_name_ar(self, obj):
         return obj.hospital.name_ar if obj.hospital else None
@@ -263,7 +267,11 @@ class AdminDoctorListSerializer(DoctorListSerializer):
         return f"{obj.experience_years} years"
 
     def get_hospitalName(self, obj):
-        return obj.hospital.name if obj.hospital else None
+        if obj.hospital:
+            return obj.hospital.name
+        if obj.clinic:
+            return obj.clinic.name
+        return None
 
     def get_clinicName(self, obj):
         return obj.clinic.name if obj.clinic else None
