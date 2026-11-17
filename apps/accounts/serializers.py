@@ -172,8 +172,8 @@ class PatientRegisterSerializer(serializers.Serializer):
         return normalized_email
 
     def validate_password(self, value):
-        if len(value) < 10:
-            raise serializers.ValidationError("Password must contain at least 10 characters.")
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must contain at least 8 characters.")
         validate_password(value)
         return value
 
