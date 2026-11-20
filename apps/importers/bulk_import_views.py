@@ -577,7 +577,25 @@ class AdminBulkImportHospitalsView(views.APIView):
             )
 
             mgr_name = rec.get('managername', '').strip()
-            mgr_phone = rec.get('managerphone', '').strip()
+            mgr_phone = (
+                rec.get('managerphone', '').strip()
+                or rec.get('managerphonenumber', '').strip()
+                or rec.get('managercontact', '').strip()
+                or rec.get('managercontactnumber', '').strip()
+                or next((v.strip() for k, v in rec.items() if k.startswith('managerphone')), '')
+            )
+            if mgr_phone:
+                clean_digits = re.sub(r'[^0-9]', '', mgr_phone)
+                if not mgr_phone.startswith('+'):
+                    if mgr_phone.startswith('00'):
+                        mgr_phone = f"+{clean_digits[2:]}"
+                    elif clean_digits.startswith('971'):
+                        mgr_phone = f"+{clean_digits}"
+                    elif clean_digits.startswith('0'):
+                        mgr_phone = f"{dial_code}{clean_digits[1:]}"
+                    else:
+                        mgr_phone = f"{dial_code}{clean_digits}"
+
             mgr_email = rec.get('manageremail', '').strip() or rec.get('mangeremail', '').strip()
 
             username = (
