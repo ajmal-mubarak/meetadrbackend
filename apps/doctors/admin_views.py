@@ -410,11 +410,62 @@ class AdminDoctorBulkActionView(views.APIView):
                     {"error": "Operations sub-administrators do not have permission to delete doctor profiles."},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            deleted_count = 0
+            from apps.appointments.models import Appointment, DoctorReview, FacilityReview
+            from apps.prescriptions.models import Prescription
+            from apps.accounts.models import User
+            from django.db.models.deletion import ProtectedError
+
             with transaction.atomic():
-                for doc in doctors:
-                    cascade_delete_doctor(doc)
-                    deleted_count += 1
+                doc_list = list(doctors.values('id', 'user_id'))
+                doc_ids = [d['id'] for d in doc_list]
+                user_ids = [d['user_id'] for d in doc_list if d['user_id']]
+
+                # 1. Appointments for these doctors
+                appt_ids = list(Appointment.objects.filter(doctor_id__in=doc_ids).values_list('id', flat=True))
+
+                # 2. Bulk delete Prescriptions
+                try:
+                    Prescription.objects.filter(
+                        Q(doctor_id__in=doc_ids) | Q(appointment_id__in=appt_ids)
+                    ).delete()
+                except Exception:
+                    pass
+
+                # 3. Bulk delete Reviews
+                try:
+                    DoctorReview.objects.filter(
+                        Q(doctor_id__in=doc_ids) | Q(appointment_id__in=appt_ids)
+                    ).delete()
+                except Exception:
+                    pass
+
+                try:
+                    FacilityReview.objects.filter(appointment_id__in=appt_ids).delete()
+                except Exception:
+                    pass
+
+                # 4. Bulk delete Schedules
+                try:
+                    DoctorSchedule.objects.filter(doctor_id__in=doc_ids).delete()
+                except Exception:
+                    pass
+
+                # 5. Bulk delete Appointments
+                try:
+                    Appointment.objects.filter(id__in=appt_ids).delete()
+                except Exception:
+                    pass
+
+                # 6. Delete Doctors
+                deleted_count, _ = Doctor.objects.filter(id__in=doc_ids).delete()
+
+                # 7. Clean up User accounts
+                if user_ids:
+                    try:
+                        User.objects.filter(id__in=user_ids, role=UserRole.DOCTOR).delete()
+                    except (ProtectedError, Exception):
+                        pass
+
             log_audit_event(
                 action="BULK_DOCTORS_DELETED",
                 target_model="Doctor",
