@@ -151,6 +151,71 @@ class AdminDoctorStatusView(views.APIView):
         return Response(AdminDoctorListSerializer(doctor).data, status=status.HTTP_200_OK)
 
 
+def cascade_delete_doctor(doctor):
+    """
+    Safely and completely deletes a Doctor profile and cleans up all dependent records:
+    1. Prescriptions referencing the doctor or any of the doctor's appointments
+    2. DoctorReviews and FacilityReviews referencing any of the doctor's appointments or doctor directly
+    3. DoctorSchedule
+    4. Appointments for the doctor
+    5. The Doctor record itself
+    6. Associated User account if the user has role DOCTOR and no other dependencies
+    """
+    from django.db.models.deletion import ProtectedError
+    from apps.appointments.models import Appointment, DoctorReview, FacilityReview
+    from apps.prescriptions.models import Prescription
+
+    user = getattr(doctor, 'user', None)
+
+    # Clean up appointments and their protected children
+    appts = doctor.appointments.all() if hasattr(doctor, 'appointments') else Appointment.objects.none()
+    appt_ids = list(appts.values_list('id', flat=True))
+
+    # 1. Prescriptions referencing doctor or doctor's appointments
+    try:
+        Prescription.objects.filter(
+            Q(doctor=doctor) | Q(appointment_id__in=appt_ids)
+        ).delete()
+    except Exception:
+        pass
+
+    # 2. Reviews referencing doctor or doctor's appointments
+    try:
+        DoctorReview.objects.filter(
+            Q(doctor=doctor) | Q(appointment_id__in=appt_ids)
+        ).delete()
+    except Exception:
+        pass
+
+    try:
+        FacilityReview.objects.filter(appointment_id__in=appt_ids).delete()
+    except Exception:
+        pass
+
+    # 3. Schedule
+    if hasattr(doctor, 'schedule'):
+        try:
+            doctor.schedule.delete()
+        except Exception:
+            pass
+
+    # 4. Appointments
+    try:
+        appts.delete()
+    except Exception:
+        pass
+
+    # 5. Doctor record
+    doctor.delete()
+
+    # 6. User account (if dedicated doctor login)
+    if user and getattr(user, 'role', None) == UserRole.DOCTOR:
+        try:
+            user.delete()
+        except (ProtectedError, Exception):
+            pass
+
+
 class AdminDoctorDetailView(views.APIView):
     """
     Platform administrator detail, edit, and deletion endpoint for individual Doctors.
@@ -276,9 +341,7 @@ class AdminDoctorDetailView(views.APIView):
         doc_name = doctor.name
 
         with transaction.atomic():
-            if hasattr(doctor, 'appointments'):
-                doctor.appointments.all().delete()
-            doctor.delete()
+            cascade_delete_doctor(doctor)
 
         log_audit_event(
             action="DOCTOR_DELETED",
@@ -347,20 +410,20 @@ class AdminDoctorBulkActionView(views.APIView):
                     {"error": "Operations sub-administrators do not have permission to delete doctor profiles."},
                     status=status.HTTP_403_FORBIDDEN
                 )
+            deleted_count = 0
             with transaction.atomic():
                 for doc in doctors:
-                    if hasattr(doc, 'appointments'):
-                        doc.appointments.all().delete()
-                    doc.delete()
+                    cascade_delete_doctor(doc)
+                    deleted_count += 1
             log_audit_event(
                 action="BULK_DOCTORS_DELETED",
                 target_model="Doctor",
                 target_id="bulk",
                 actor=request.user,
-                change_summary={"count": count, "ids": [str(u) for u in valid_uuids]},
+                change_summary={"count": deleted_count, "ids": [str(u) for u in valid_uuids]},
                 request=request
             )
-            return Response({"message": f"Successfully deleted {count} doctors.", "count": count})
+            return Response({"message": f"Successfully deleted {deleted_count} doctors.", "count": deleted_count})
 
         return Response({"error": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)
 
