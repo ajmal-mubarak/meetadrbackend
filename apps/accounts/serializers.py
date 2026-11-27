@@ -229,7 +229,28 @@ class LoginSerializer(serializers.Serializer):
 
         candidates = [login_input]
         if '@' not in login_input:
-            candidates.append(f"{login_input}@meetadr.ae")
+            candidates.extend([
+                f"{login_input}@meetadr.ae",
+                f"{login_input}@hospital.meetadr.local",
+                f"{login_input}@meetadr.local",
+                f"{login_input}@doctor.meetadr.local",
+                f"{login_input}@meetadr.demo",
+            ])
+            # Check users created with email starting with username before @ or unique suffix
+            prefix_users = User.objects.filter(email__istartswith=f"{login_input}@")[:5]
+            for u in prefix_users:
+                if u.email.lower() not in candidates:
+                    candidates.append(u.email.lower())
+            suffix_users = User.objects.filter(email__istartswith=f"{login_input}_")[:5]
+            for u in suffix_users:
+                if u.email.lower() not in candidates:
+                    candidates.append(u.email.lower())
+            # Support mobile phone number login if input matches phone
+            clean_phone = re.sub(r'[\s\-()]', '', login_input)
+            phone_users = User.objects.filter(phone__in=[login_input, clean_phone])[:5] if clean_phone else []
+            for u in phone_users:
+                if u.email.lower() not in candidates:
+                    candidates.append(u.email.lower())
 
         req = self.context.get('request')
         user = None
