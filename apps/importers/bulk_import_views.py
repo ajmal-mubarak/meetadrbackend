@@ -506,6 +506,11 @@ class AdminBulkImportHospitalsView(views.APIView):
                 or 'Dubai'
             )
             area = rec.get('areasubdistrict', '').strip() or rec.get('area', '').strip()
+            clean_area = re.sub(r'\s*\([^)]*\)\s*$', '', area).strip() if area else ''
+            if emirate and clean_area and emirate.lower() != clean_area.lower():
+                loc_val = f"{emirate} - {clean_area}"
+            else:
+                loc_val = emirate or clean_area or 'Dubai'
             address = (
                 rec.get('address', '').strip()
                 or rec.get('addressoforganization', '').strip()
@@ -645,7 +650,7 @@ class AdminBulkImportHospitalsView(views.APIView):
                         name=h_name,
                         country=country,
                         emirate=emirate,
-                        location=emirate,
+                        location=loc_val,
                         area=area,
                         address=address,
                         latitude=lat,
@@ -671,7 +676,7 @@ class AdminBulkImportHospitalsView(views.APIView):
                         name=h_name,
                         country=country,
                         emirate=emirate,
-                        location=emirate,
+                        location=loc_val,
                         area=area,
                         address=address,
                         latitude=lat,

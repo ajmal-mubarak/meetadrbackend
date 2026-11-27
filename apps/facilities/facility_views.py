@@ -749,9 +749,18 @@ class AdminProviderListView(views.APIView):
 
         country = data.get('country') or 'UAE'
 
-        emirate = data.get('emirate') or location
+        emirate = (data.get('emirate') or location).strip()
 
-        area = data.get('area') or ''
+        area = (data.get('area') or '').strip()
+
+        import re
+        clean_area = re.sub(r'\s*\([^)]*\)\s*$', '', area).strip()
+        if emirate and clean_area and emirate.lower() != clean_area.lower():
+            location = f"{emirate} - {clean_area}"
+        elif emirate:
+            location = emirate
+        elif clean_area:
+            location = clean_area
 
         latitude = data.get('latitude')
 
@@ -1195,6 +1204,16 @@ class AdminProviderDetailView(views.APIView):
         if 'area' in data:
 
             facility.area = (data['area'] or '').strip()
+
+        if 'emirate' in data or 'area' in data:
+            import re
+            em = (facility.emirate or 'Dubai').strip()
+            ar = (facility.area or '').strip()
+            clean_ar = re.sub(r'\s*\([^)]*\)\s*$', '', ar).strip()
+            if em and clean_ar and em.lower() != clean_ar.lower():
+                facility.location = f"{em} - {clean_ar}"
+            elif em:
+                facility.location = em
 
         if 'latitude' in data:
 

@@ -101,6 +101,7 @@ class ClinicListSerializer(serializers.ModelSerializer):
             'phone', 'operating_hours', 'operating_hours_ar',
             'about', 'about_ar', 'google_maps_url', 'insurance_plans', 'status', 'doctor_count',
             'avg_rating', 'total_reviews',
+            'country', 'emirate', 'area', 'latitude', 'longitude', 'phone_dial_code',
         ]
 
     def get_doctor_count(self, obj):
