@@ -46,6 +46,18 @@ class Doctor(models.Model):
         blank=True,
         related_name='doctors'
     )
+    hospitals = models.ManyToManyField(
+        Hospital,
+        blank=True,
+        related_name='affiliated_doctors',
+        help_text="All hospitals where this doctor practices."
+    )
+    clinics = models.ManyToManyField(
+        Clinic,
+        blank=True,
+        related_name='affiliated_doctors',
+        help_text="All clinics where this doctor practices."
+    )
     location = models.CharField(max_length=128)
     about = models.TextField(blank=True)
     about_ar = models.TextField(blank=True)
@@ -81,6 +93,20 @@ class Doctor(models.Model):
                 name='doctor_cannot_belong_to_both_hospital_and_clinic'
             )
         ]
+
+    def get_all_hospitals(self):
+        """Returns all hospitals affiliated with this doctor, including primary."""
+        ids = list(self.hospitals.values_list('id', flat=True))
+        if self.hospital_id and self.hospital_id not in ids:
+            ids.append(self.hospital_id)
+        return Hospital.objects.filter(id__in=ids)
+
+    def get_all_clinics(self):
+        """Returns all clinics affiliated with this doctor, including primary."""
+        ids = list(self.clinics.values_list('id', flat=True))
+        if self.clinic_id and self.clinic_id not in ids:
+            ids.append(self.clinic_id)
+        return Clinic.objects.filter(id__in=ids)
 
     def clean(self):
         super().clean()

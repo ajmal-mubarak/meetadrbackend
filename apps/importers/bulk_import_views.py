@@ -326,25 +326,45 @@ class AdminBulkImportDoctorsView(views.APIView):
 
                 if not dup_doc:
                     q_dup = Doctor.objects.filter(name__iexact=full_name, specialty__iexact=specialty)
-                    if facility_hospital:
-                        q_dup = q_dup.filter(hospital=facility_hospital)
-                    elif facility_clinic:
-                        q_dup = q_dup.filter(clinic=facility_clinic)
                     dup_doc = q_dup.first()
 
                 if not dup_doc and contact_number and len(contact_number) >= 7:
                     dup_doc = Doctor.objects.filter(contact_number=contact_number).first()
 
                 if dup_doc:
-                    skipped_count += 1
-                    fac_info = dup_doc.hospital.name if dup_doc.hospital else (dup_doc.clinic.name if dup_doc.clinic else 'Independent')
-                    errors.append({
-                        'record': idx,
-                        'name': full_name,
-                        'error': f"Doctor '{full_name}' ({specialty}) already exists at {fac_info}.",
-                        'skipped': True
-                    })
-                    continue
+                    # Check if incoming record has an affiliated hospital/clinic to link
+                    linked_new_facility = False
+                    if facility_hospital:
+                        already_linked = (dup_doc.hospital_id == facility_hospital.id) or dup_doc.hospitals.filter(id=facility_hospital.id).exists()
+                        if not already_linked:
+                            dup_doc.hospitals.add(facility_hospital)
+                            if not dup_doc.hospital:
+                                dup_doc.hospital = facility_hospital
+                                dup_doc.save(update_fields=['hospital'])
+                            linked_new_facility = True
+                    elif facility_clinic:
+                        already_linked = (dup_doc.clinic_id == facility_clinic.id) or dup_doc.clinics.filter(id=facility_clinic.id).exists()
+                        if not already_linked:
+                            dup_doc.clinics.add(facility_clinic)
+                            if not dup_doc.clinic:
+                                dup_doc.clinic = facility_clinic
+                                dup_doc.save(update_fields=['clinic'])
+                            linked_new_facility = True
+
+                    if linked_new_facility:
+                        created_count += 1
+                        created_doctors.append({'id': str(dup_doc.id), 'name': dup_doc.name, 'specialty': dup_doc.specialty})
+                        continue
+                    else:
+                        skipped_count += 1
+                        fac_info = facility_hospital.name if facility_hospital else (facility_clinic.name if facility_clinic else (dup_doc.hospital.name if dup_doc.hospital else 'Independent'))
+                        errors.append({
+                            'record': idx,
+                            'name': full_name,
+                            'error': f"Doctor '{full_name}' ({specialty}) is already affiliated with {fac_info}.",
+                            'skipped': True
+                        })
+                        continue
 
                 # User account
                 user = None
@@ -384,6 +404,11 @@ class AdminBulkImportDoctorsView(views.APIView):
                     consultation_fee=Decimal('350.00'),
                     status=FacilityStatus.ACTIVE,
                 )
+
+                if facility_hospital:
+                    doc.hospitals.add(facility_hospital)
+                elif facility_clinic:
+                    doc.clinics.add(facility_clinic)
 
                 # Initialize schedule
                 DoctorSchedule.objects.create(
@@ -890,24 +915,43 @@ class FacilityBulkImportDoctorsView(views.APIView):
 
                 if not dup_doc:
                     q_dup = Doctor.objects.filter(name__iexact=full_name, specialty__iexact=specialty)
-                    if is_hosp:
-                        q_dup = q_dup.filter(hospital=facility)
-                    else:
-                        q_dup = q_dup.filter(clinic=facility)
                     dup_doc = q_dup.first()
 
                 if not dup_doc and contact_number and len(contact_number) >= 7:
                     dup_doc = Doctor.objects.filter(contact_number=contact_number).first()
 
                 if dup_doc:
-                    skipped_count += 1
-                    errors.append({
-                        'record': idx,
-                        'name': full_name,
-                        'error': f"Doctor '{full_name}' ({specialty}) already exists at {facility.name}.",
-                        'skipped': True
-                    })
-                    continue
+                    linked_new_facility = False
+                    if is_hosp:
+                        already_linked = (dup_doc.hospital_id == facility.id) or dup_doc.hospitals.filter(id=facility.id).exists()
+                        if not already_linked:
+                            dup_doc.hospitals.add(facility)
+                            if not dup_doc.hospital:
+                                dup_doc.hospital = facility
+                                dup_doc.save(update_fields=['hospital'])
+                            linked_new_facility = True
+                    else:
+                        already_linked = (dup_doc.clinic_id == facility.id) or dup_doc.clinics.filter(id=facility.id).exists()
+                        if not already_linked:
+                            dup_doc.clinics.add(facility)
+                            if not dup_doc.clinic:
+                                dup_doc.clinic = facility
+                                dup_doc.save(update_fields=['clinic'])
+                            linked_new_facility = True
+
+                    if linked_new_facility:
+                        created_count += 1
+                        created_doctors.append({'id': str(dup_doc.id), 'name': dup_doc.name, 'specialty': dup_doc.specialty})
+                        continue
+                    else:
+                        skipped_count += 1
+                        errors.append({
+                            'record': idx,
+                            'name': full_name,
+                            'error': f"Doctor '{full_name}' ({specialty}) is already affiliated with {facility.name}.",
+                            'skipped': True
+                        })
+                        continue
 
                 user = None
                 if user_email:
@@ -945,6 +989,11 @@ class FacilityBulkImportDoctorsView(views.APIView):
                     consultation_fee=Decimal('350.00'),
                     status=FacilityStatus.ACTIVE,
                 )
+
+                if is_hosp:
+                    doc.hospitals.add(facility)
+                else:
+                    doc.clinics.add(facility)
 
                 DoctorSchedule.objects.create(
                     doctor=doc,

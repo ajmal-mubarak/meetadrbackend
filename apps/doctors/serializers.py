@@ -117,6 +117,8 @@ class DoctorListSerializer(serializers.ModelSerializer):
     hospital_name_ar = serializers.SerializerMethodField()
     clinic_id = serializers.SerializerMethodField()
     clinic_name = serializers.SerializerMethodField()
+    affiliated_hospitals = serializers.SerializerMethodField()
+    affiliated_clinics = serializers.SerializerMethodField()
     available_days = serializers.SerializerMethodField()
     available_slots = serializers.SerializerMethodField()
 
@@ -131,7 +133,8 @@ class DoctorListSerializer(serializers.ModelSerializer):
             'clinic_id', 'clinic_name',
             'about', 'about_ar', 'education', 'available_days', 'available_slots',
             'first_name', 'last_name', 'gender', 'department', 'qualifications',
-            'country_of_origin', 'languages', 'phone_dial_code', 'contact_number', 'email'
+            'country_of_origin', 'languages', 'phone_dial_code', 'contact_number', 'email',
+            'affiliated_hospitals', 'affiliated_clinics'
         ]
 
     def get_hospital_id(self, obj):
@@ -152,6 +155,55 @@ class DoctorListSerializer(serializers.ModelSerializer):
 
     def get_clinic_name(self, obj):
         return obj.clinic.name if obj.clinic else None
+
+    def get_affiliated_hospitals(self, obj):
+        hospitals_dict = {}
+        if obj.hospital:
+            hospitals_dict[str(obj.hospital.id)] = {
+                'id': str(obj.hospital.id),
+                'name': obj.hospital.name,
+                'name_ar': obj.hospital.name_ar,
+                'location': obj.hospital.location,
+                'photo': obj.hospital.photo or '',
+                'is_primary': True,
+            }
+        for h in obj.hospitals.all():
+            hid = str(h.id)
+            if hid not in hospitals_dict:
+                hospitals_dict[hid] = {
+                    'id': hid,
+                    'name': h.name,
+                    'name_ar': h.name_ar,
+                    'location': h.location,
+                    'photo': h.photo or '',
+                    'is_primary': False,
+                }
+        return list(hospitals_dict.values())
+
+    def get_affiliated_clinics(self, obj):
+        clinics_dict = {}
+        if obj.clinic:
+            clinics_dict[str(obj.clinic.id)] = {
+                'id': str(obj.clinic.id),
+                'name': obj.clinic.name,
+                'name_ar': obj.clinic.name_ar,
+                'location': obj.clinic.location,
+                'photo': obj.clinic.photo or '',
+                'is_primary': True,
+            }
+        for c in obj.clinics.all():
+            cid = str(c.id)
+            if cid not in clinics_dict:
+                clinics_dict[cid] = {
+                    'id': cid,
+                    'name': c.name,
+                    'name_ar': c.name_ar,
+                    'location': c.location,
+                    'photo': c.photo or '',
+                    'is_primary': False,
+                }
+        return list(clinics_dict.values())
+
 
     def get_available_days(self, obj):
         if hasattr(obj, 'schedule') and obj.schedule:

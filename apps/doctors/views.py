@@ -69,8 +69,10 @@ class DoctorListView(generics.ListAPIView):
             status=FacilityStatus.ACTIVE
         ).filter(
             Q(hospital__isnull=False, hospital__status=FacilityStatus.ACTIVE) |
-            Q(clinic__isnull=False, clinic__status=FacilityStatus.ACTIVE)
-        ).select_related('hospital', 'clinic', 'schedule')
+            Q(hospitals__status=FacilityStatus.ACTIVE) |
+            Q(clinic__isnull=False, clinic__status=FacilityStatus.ACTIVE) |
+            Q(clinics__status=FacilityStatus.ACTIVE)
+        ).distinct().select_related('hospital', 'clinic', 'schedule').prefetch_related('hospitals', 'clinics')
 
         params = self.request.query_params
 
@@ -89,7 +91,7 @@ class DoctorListView(generics.ListAPIView):
         if hospital_id and hospital_id.lower() != 'all':
             try:
                 valid_uuid = uuid.UUID(str(hospital_id).strip())
-                queryset = queryset.filter(hospital_id=valid_uuid)
+                queryset = queryset.filter(Q(hospital_id=valid_uuid) | Q(hospitals__id=valid_uuid)).distinct()
             except (ValueError, AttributeError):
                 return queryset.none()
 
@@ -98,7 +100,7 @@ class DoctorListView(generics.ListAPIView):
         if clinic_id and clinic_id.lower() != 'all':
             try:
                 valid_uuid = uuid.UUID(str(clinic_id).strip())
-                queryset = queryset.filter(clinic_id=valid_uuid)
+                queryset = queryset.filter(Q(clinic_id=valid_uuid) | Q(clinics__id=valid_uuid)).distinct()
             except (ValueError, AttributeError):
                 return queryset.none()
 

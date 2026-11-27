@@ -1,5 +1,5 @@
 """Hospital, Clinic, Department, and Medical Conditions Serializers."""
-from django.db.models import Avg, Sum, Count
+from django.db.models import Avg, Sum, Count, Q
 from rest_framework import serializers
 from apps.facilities.models import Hospital, Clinic, FacilityDepartment, FacilityStatus
 from apps.doctors.models import Doctor
@@ -42,20 +42,16 @@ class HospitalListSerializer(serializers.ModelSerializer):
     def get_doctor_count(self, obj):
         if hasattr(obj, 'doctor_count'):
             return obj.doctor_count
-        return obj.doctors.filter(status=FacilityStatus.ACTIVE).count()
+        return Doctor.objects.filter(status=FacilityStatus.ACTIVE).filter(
+            Q(hospital=obj) | Q(hospitals=obj)
+        ).distinct().count()
 
     def get_specialties(self, obj):
-        # Use in-memory prefetched doctors if available to eliminate per-facility SQL query
-        if hasattr(obj, '_prefetched_objects_cache') and 'doctors' in obj._prefetched_objects_cache:
-            return sorted(list(set(
-                doc.specialty for doc in obj.doctors.all()
-                if doc.status == FacilityStatus.ACTIVE
-            )))
-        return list(
-            obj.doctors.filter(status=FacilityStatus.ACTIVE)
-            .values_list('specialty', flat=True)
-            .distinct()
-        )
+        return sorted(list(set(
+            Doctor.objects.filter(status=FacilityStatus.ACTIVE).filter(
+                Q(hospital=obj) | Q(hospitals=obj)
+            ).values_list('specialty', flat=True).distinct()
+        )))
 
     def get_avg_rating(self, obj):
         """
@@ -84,7 +80,9 @@ class HospitalDetailSerializer(HospitalListSerializer):
         fields = HospitalListSerializer.Meta.fields + ['departments', 'doctors']
 
     def get_doctors(self, obj):
-        active_doctors = obj.doctors.filter(status=FacilityStatus.ACTIVE)
+        active_doctors = Doctor.objects.filter(status=FacilityStatus.ACTIVE).filter(
+            Q(hospital=obj) | Q(hospitals=obj)
+        ).distinct()
         return PublicDoctorSummarySerializer(active_doctors, many=True).data
 
 class ClinicListSerializer(serializers.ModelSerializer):
@@ -107,7 +105,9 @@ class ClinicListSerializer(serializers.ModelSerializer):
     def get_doctor_count(self, obj):
         if hasattr(obj, 'doctor_count'):
             return obj.doctor_count
-        return obj.doctors.filter(status=FacilityStatus.ACTIVE).count()
+        return Doctor.objects.filter(status=FacilityStatus.ACTIVE).filter(
+            Q(clinic=obj) | Q(clinics=obj)
+        ).distinct().count()
 
     def get_avg_rating(self, obj):
         agg = obj.reviews.aggregate(
@@ -131,7 +131,9 @@ class ClinicDetailSerializer(ClinicListSerializer):
         fields = ClinicListSerializer.Meta.fields + ['doctors']
 
     def get_doctors(self, obj):
-        active_doctors = obj.doctors.filter(status=FacilityStatus.ACTIVE)
+        active_doctors = Doctor.objects.filter(status=FacilityStatus.ACTIVE).filter(
+            Q(clinic=obj) | Q(clinics=obj)
+        ).distinct()
         return PublicDoctorSummarySerializer(active_doctors, many=True).data
 
 class HealthConditionSerializer(serializers.Serializer):
